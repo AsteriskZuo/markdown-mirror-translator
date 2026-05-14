@@ -34,7 +34,10 @@ export class TranslatedDocumentProvider implements vscode.TextDocumentContentPro
 	setSession(session: TranslationSession): void {
 		const translatedKey = session.translatedUri.toString();
 		this.sessionsByTranslatedUri.set(translatedKey, session);
-		this.changeEmitter.fire(session.translatedUri);
+	}
+
+	refreshSession(translatedUri: vscode.Uri): void {
+		this.changeEmitter.fire(translatedUri);
 	}
 
 	getSessionByTranslatedUri(translatedUri: vscode.Uri): TranslationSession | undefined {

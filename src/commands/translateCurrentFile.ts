@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
 import { getConfig } from '../config';
 import { TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
+import { parseMarkdownBlocks } from '../markdown/parser';
+import { renderMarkdown } from '../markdown/renderer';
+import { createThrottledRefresh } from '../refresh/throttledRefresh';
 import { createInitialSession } from '../translationSession';
+import { MockTranslator } from '../translation/providers/mockTranslator';
 
 const translateCommandId = 'markdown-mirror-translator.translateCurrentFile';
+const virtualDocumentRefreshDelayMs = 25;
 
 function isMarkdownDocument(document: vscode.TextDocument): boolean {
 	return document.languageId === 'markdown' || document.fileName.toLowerCase().endsWith('.md');
@@ -32,15 +37,32 @@ export async function translateCurrentFile(provider: TranslatedDocumentProvider)
 	}
 
 	const config = getConfig();
+	const renderMode = config.bilingual ? 'bilingual' : 'translated';
 	const translatedUri = provider.getTranslatedUri(document.uri, config.targetLanguage, config.bilingual);
+	const sourceBlocks = parseMarkdownBlocks(sourceContent);
+	const translator = new MockTranslator();
+	const translatedBlocks = await translator.translateBlocks({
+		sourceLanguage: config.sourceLanguage,
+		targetLanguage: config.targetLanguage,
+		blocks: sourceBlocks,
+	});
+	const renderedContent = renderMarkdown(translatedBlocks, renderMode);
 	const session = createInitialSession({
 		sourceUri: document.uri,
 		translatedUri,
 		sourceContent,
+		sourceBlocks,
+		translatedBlocks,
+		renderedContent,
+		renderMode,
 		config,
 	});
+	const refresh = createThrottledRefresh(() => provider.refreshSession(translatedUri), virtualDocumentRefreshDelayMs);
 
 	provider.setSession(session);
+	refresh.request();
+	refresh.flush();
+	refresh.dispose();
 
 	const translatedDocument = await vscode.workspace.openTextDocument(translatedUri);
 	await vscode.window.showTextDocument(translatedDocument, {
