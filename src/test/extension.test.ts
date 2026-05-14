@@ -17,7 +17,9 @@ suite('Markdown Mirror Translator shell', () => {
 	test('extension commands are registered after activation', async () => {
 		const extension = vscode.extensions.getExtension('undefined_publisher.markdown-mirror-translator');
 
-		await extension?.activate();
+		assert.ok(extension);
+		await extension.activate();
+		assert.strictEqual(extension.isActive, true);
 
 		const commands = await vscode.commands.getCommands(true);
 		assert.ok(commands.includes('markdown-mirror-translator.translateCurrentFile'));
