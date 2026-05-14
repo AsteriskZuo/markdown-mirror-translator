@@ -99,5 +99,7 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.ok(secondTranslatedEditor);
 		assert.strictEqual(secondTranslatedEditor.document.uri.toString(), firstTranslatedUri);
 		assert.strictEqual(secondTranslatedEditor.document.getText(), '# Hello\n\nWorld\n');
+
+		await vscode.commands.executeCommand('markdown-mirror-translator.saveTranslatedFile');
 	});
 });
