@@ -70,6 +70,10 @@ Every completed change requires the narrowest useful verification: type checks, 
 
 If verification cannot be completed, say exactly what was not verified and why.
 
+## Known Verification Constraints
+
+This VS Code extension uses `vscode-test` for `npm test`. Run `npm test` with escalated permissions directly for baseline or verification because it may need network access and VS Code/Electron runtime startup. Prefer the narrow persistent approval prefix `["npm", "test"]`.
+
 ## Documentation
 
 - Keep long-term agent rules in `AGENTS.md`.
