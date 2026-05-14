@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { getConfig } from '../config';
+import { translatedDocumentScheme, TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
 import { createInitialSession } from '../translationSession';
 
 suite('Markdown Mirror Translator shell', () => {
@@ -42,5 +43,33 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.strictEqual(session.sourceContent, '# Hello\n\nWorld\n');
 		assert.strictEqual(session.renderedContent, '# Hello\n\nWorld\n');
 		assert.ok(session.updatedAt > 0);
+	});
+
+	test('TranslatedDocumentProvider reuses one translated URI per source URI', () => {
+		const provider = new TranslatedDocumentProvider();
+		const sourceUri = vscode.Uri.file('/workspace/README.md');
+
+		const firstUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+		const secondUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+
+		assert.strictEqual(firstUri.toString(), secondUri.toString());
+		assert.strictEqual(firstUri.scheme, translatedDocumentScheme);
+		assert.ok(firstUri.path.endsWith('.md'));
+	});
+
+	test('TranslatedDocumentProvider returns session rendered content', () => {
+		const provider = new TranslatedDocumentProvider();
+		const sourceUri = vscode.Uri.file('/workspace/README.md');
+		const translatedUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+		const session = createInitialSession({
+			sourceUri,
+			translatedUri,
+			sourceContent: '# Hello\n',
+			config: getConfig(),
+		});
+
+		provider.setSession(session);
+
+		assert.strictEqual(provider.provideTextDocumentContent(translatedUri), '# Hello\n');
 	});
 });
