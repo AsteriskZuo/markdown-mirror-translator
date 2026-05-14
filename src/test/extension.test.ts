@@ -1,15 +1,24 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import { getConfig } from '../config';
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+suite('Markdown Mirror Translator shell', () => {
+	test('getConfig reads default extension settings', () => {
+		const config = getConfig();
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+		assert.strictEqual(config.sourceLanguage, '');
+		assert.strictEqual(config.targetLanguage, 'zh-CN');
+		assert.strictEqual(config.bilingual, false);
+		assert.strictEqual(config.translationUpdateMode, 'manual');
+	});
+
+	test('extension commands are registered after activation', async () => {
+		const extension = vscode.extensions.getExtension('undefined_publisher.markdown-mirror-translator');
+
+		await extension?.activate();
+
+		const commands = await vscode.commands.getCommands(true);
+		assert.ok(commands.includes('markdown-mirror-translator.translateCurrentFile'));
+		assert.ok(commands.includes('markdown-mirror-translator.saveTranslatedFile'));
 	});
 });
