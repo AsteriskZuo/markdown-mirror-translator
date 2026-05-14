@@ -47,7 +47,7 @@ Markdown Mirror Translator: Translate Current File
 
 该命令既可以执行首次翻译，也可以刷新已有译文。
 
-### 4.2 编辑器标题菜单
+### 4.2 编辑器标题栏按钮
 
 在 Markdown 文件编辑器标题栏右侧工具区提供同一个按钮入口：
 
@@ -62,7 +62,7 @@ Markdown Mirror Translator: Translate Current File
 ## 5. 核心交互流程
 
 1. 用户打开一个 `.md` 文件。
-2. 用户执行 `Markdown Mirror Translator: Translate Current File`。
+2. 用户触发 `Markdown Mirror Translator: Translate Current File`。
 3. 插件检查当前文件是否为 Markdown。
 4. 插件读取全文内容。
 5. 插件保护不应翻译的 Markdown 结构。
@@ -154,8 +154,8 @@ This is a document.
 原始语言。
 
 - 默认值：空字符串
-- 含义：自动检测源语言
-- 用户也可以指定具体语言，例如 `en`、`ja`、`zh-CN`
+- 含义：源语言不限定，可以翻译任意源语言内容
+- 用户也可以指定一种源语言，例如 `en`、`ja`、`zh-CN`
 
 ### 8.2 `markdownMirrorTranslator.targetLanguage`
 
@@ -181,11 +181,19 @@ This is a document.
 - `manual`：用户通过原翻译命令或编辑器标题栏右侧工具区按钮手动触发时，才更新右侧译文
 - `auto`：后续预留，表示原始 Markdown 文档变更后自动更新右侧译文
 
-一期只实现 `manual`。`auto` 后续需要结合防抖、语法不完整状态、代码块保护、接口调用频率和失败回退再设计。
+一期只实现 `manual`。如果用户将该配置设置为 `auto`，一期仍按 `manual` 处理，不监听原始 Markdown 文档变更。`auto` 后续需要结合防抖、语法不完整状态、代码块保护、接口调用频率和失败回退再设计。
 
 ## 9. 保存设计
 
 右侧翻译结果是插件管理的只读文档。用户不能直接编辑或直接使用 VS Code 原生保存能力保存该虚拟文档，应使用插件提供的一键保存。
+
+保存入口使用独立命令：
+
+```text
+Markdown Mirror Translator: Save Translated File
+```
+
+该命令保存当前翻译结果。一期在命令面板提供该命令，并在右侧只读译文文档的编辑器标题栏工具区提供同一个保存入口；不同入口触发同一个保存命令。
 
 默认保存到原始文档所在目录。
 
@@ -203,12 +211,12 @@ This is a document.
 默认不翻译：
 
 - fenced code block
-- inline code
+- inline code，例如 `` `xxx` ``
 - URL
 - Markdown link URL
 - image URL
-- frontmatter key
-- HTML 标签名
+- frontmatter 整体
+- HTML block 和 inline HTML 整体
 
 可以翻译：
 
@@ -260,6 +268,8 @@ This is a document.
 翻译结果文档不是普通可编辑文件。它的内容由插件内部翻译会话状态渲染生成。
 
 virtual document 的 URI 应使用 `.md` 后缀，并确保语言模式为 Markdown。
+
+同一个源文件重复翻译时，应复用同一个右侧 virtual document，不重复打开多个翻译结果文档。
 
 由于 `TextDocumentContentProvider` 刷新时通常会重新提供整份内容，翻译结果刷新需要节流。多个 block 翻译结果在短时间内返回时，应合并刷新，默认刷新间隔建议为 400ms。
 
