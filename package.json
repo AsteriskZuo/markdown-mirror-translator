@@ -9,15 +9,67 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:markdown-mirror-translator.translateCurrentFile",
+    "onCommand:markdown-mirror-translator.saveTranslatedFile"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "markdown-mirror-translator.helloWorld",
-        "title": "Hello World"
+        "command": "markdown-mirror-translator.translateCurrentFile",
+        "title": "Markdown Mirror Translator: Translate Current File",
+        "category": "Markdown Mirror Translator"
+      },
+      {
+        "command": "markdown-mirror-translator.saveTranslatedFile",
+        "title": "Markdown Mirror Translator: Save Translated File",
+        "category": "Markdown Mirror Translator"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Markdown Mirror Translator",
+      "properties": {
+        "markdownMirrorTranslator.sourceLanguage": {
+          "type": "string",
+          "default": "",
+          "description": "Source language code. Leave empty to let the translator accept any source language."
+        },
+        "markdownMirrorTranslator.targetLanguage": {
+          "type": "string",
+          "default": "zh-CN",
+          "description": "Target language code for translated Markdown."
+        },
+        "markdownMirrorTranslator.bilingual": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show source and translated Markdown together in the translated document."
+        },
+        "markdownMirrorTranslator.translationUpdateMode": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "auto"
+          ],
+          "default": "manual",
+          "description": "Translation update mode. Phase 1 treats auto as manual."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "markdown-mirror-translator.translateCurrentFile",
+          "when": "resourceLangId == markdown",
+          "group": "navigation"
+        },
+        {
+          "command": "markdown-mirror-translator.saveTranslatedFile",
+          "when": "resourceScheme == 'markdown-mirror-translator'",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
