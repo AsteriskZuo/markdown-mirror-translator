@@ -74,4 +74,30 @@ suite('Markdown Mirror Translator shell', () => {
 
 		assert.strictEqual(provider.provideTextDocumentContent(translatedUri), '# Hello\n');
 	});
+
+	test('translate command opens a reused virtual Markdown document with source content', async () => {
+		const sourceDocument = await vscode.workspace.openTextDocument({
+			content: '# Hello\n\nWorld\n',
+			language: 'markdown',
+		});
+
+		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
+		await vscode.commands.executeCommand('markdown-mirror-translator.translateCurrentFile');
+
+		const firstTranslatedEditor = vscode.window.activeTextEditor;
+		assert.ok(firstTranslatedEditor);
+		assert.strictEqual(firstTranslatedEditor.document.uri.scheme, translatedDocumentScheme);
+		assert.strictEqual(firstTranslatedEditor.document.languageId, 'markdown');
+		assert.strictEqual(firstTranslatedEditor.document.getText(), '# Hello\n\nWorld\n');
+
+		const firstTranslatedUri = firstTranslatedEditor.document.uri.toString();
+
+		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
+		await vscode.commands.executeCommand('markdown-mirror-translator.translateCurrentFile');
+
+		const secondTranslatedEditor = vscode.window.activeTextEditor;
+		assert.ok(secondTranslatedEditor);
+		assert.strictEqual(secondTranslatedEditor.document.uri.toString(), firstTranslatedUri);
+		assert.strictEqual(secondTranslatedEditor.document.getText(), '# Hello\n\nWorld\n');
+	});
 });
