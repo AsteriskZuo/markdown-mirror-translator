@@ -16,6 +16,10 @@ function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 		return block.source;
 	}
 
+	if (block.state === 'failed') {
+		return block.source;
+	}
+
 	const translatedText = restoreInlineTokens(block.translatedText, block);
 
 	if (block.kind === 'heading') {

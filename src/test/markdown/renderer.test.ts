@@ -8,9 +8,12 @@ function block(input: Partial<TranslatedMarkdownBlock> & Pick<TranslatedMarkdown
 		kind: input.kind ?? 'paragraph',
 		source: input.source,
 		text: input.text ?? input.source.trim(),
+		hash: input.hash ?? 'hash-0',
 		translatable: input.translatable ?? true,
+		state: input.state ?? 'translated',
 		protectedInlines: input.protectedInlines ?? [],
 		translatedText: input.translatedText,
+		errorMessage: input.errorMessage,
 	};
 }
 
@@ -63,5 +66,22 @@ suite('Markdown renderer', () => {
 		);
 
 		assert.strictEqual(rendered, '# Hello\n\n# [zh-CN] Hello\n\nWorld\n\n[zh-CN] World\n');
+	});
+
+	test('renders failed translatable blocks as their original source', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					source: 'World\n',
+					text: 'World',
+					state: 'failed',
+					translatedText: '',
+					errorMessage: 'provider failed',
+				}),
+			],
+			'translated',
+		);
+
+		assert.strictEqual(rendered, 'World\n');
 	});
 });

@@ -60,7 +60,7 @@
       "editor/title": [
         {
           "command": "markdown-mirror-translator.translateCurrentFile",
-          "when": "resourceLangId == markdown",
+          "when": "resourceLangId == markdown && resourceScheme != 'markdown-mirror-translator'",
           "group": "navigation"
         },
         {

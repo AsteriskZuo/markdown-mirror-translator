@@ -1,20 +1,43 @@
 import * as vscode from 'vscode';
+import type * as vscodeTypes from 'vscode';
+import { TranslationCache } from '../cache/translationCache';
 import { getConfig } from '../config';
-import { TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
+import { translatedDocumentScheme, TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
 import { parseMarkdownBlocks } from '../markdown/parser';
 import { renderMarkdown } from '../markdown/renderer';
 import { createThrottledRefresh } from '../refresh/throttledRefresh';
-import { createInitialSession } from '../translationSession';
-import { MockTranslator } from '../translation/providers/mockTranslator';
+import { GoogleFreeTranslator } from '../translation/providers/googleFreeTranslator';
+import { TranslationScheduler } from '../translation/scheduler';
+import type { TranslatorProvider } from '../translation/types';
+import { createInitialSession, replaceTranslatedBlocks } from '../translationSession';
 
 const translateCommandId = 'markdown-mirror-translator.translateCurrentFile';
-const virtualDocumentRefreshDelayMs = 25;
+const virtualDocumentRefreshDelayMs = 400;
+const smallDocumentMaxCharacters = 20_000;
+const largeDocumentMaxCharacters = 200_000;
+const translationConcurrency = 3;
 
-function isMarkdownDocument(document: vscode.TextDocument): boolean {
+type MarkdownDocumentIdentity = Pick<vscode.TextDocument, 'uri' | 'languageId' | 'fileName'>;
+
+export type TranslateCurrentFileDependencies = {
+	createProvider?: () => TranslatorProvider;
+	createCache?: () => TranslationCache;
+	openTranslatedDocument?: (uri: vscode.Uri) => Promise<void>;
+};
+
+export function isTranslatableMarkdownDocument(document: MarkdownDocumentIdentity): boolean {
+	if (document.uri.scheme === translatedDocumentScheme) {
+		return false;
+	}
+
 	return document.languageId === 'markdown' || document.fileName.toLowerCase().endsWith('.md');
 }
 
-export async function translateCurrentFile(provider: TranslatedDocumentProvider): Promise<void> {
+export async function translateCurrentFile(
+	provider: TranslatedDocumentProvider,
+	globalState: vscodeTypes.Memento,
+	dependencies: TranslateCurrentFileDependencies = {},
+): Promise<void> {
 	const editor = vscode.window.activeTextEditor;
 
 	if (!editor) {
@@ -24,7 +47,7 @@ export async function translateCurrentFile(provider: TranslatedDocumentProvider)
 
 	const document = editor.document;
 
-	if (!isMarkdownDocument(document)) {
+	if (!isTranslatableMarkdownDocument(document)) {
 		vscode.window.showInformationMessage('Markdown Mirror Translator only translates Markdown files.');
 		return;
 	}
@@ -40,20 +63,16 @@ export async function translateCurrentFile(provider: TranslatedDocumentProvider)
 	const renderMode = config.bilingual ? 'bilingual' : 'translated';
 	const translatedUri = provider.getTranslatedUri(document.uri, config.targetLanguage, config.bilingual);
 	const sourceBlocks = parseMarkdownBlocks(sourceContent);
-	const translator = new MockTranslator();
-	const translatedBlocks = await translator.translateBlocks({
-		sourceLanguage: config.sourceLanguage,
-		targetLanguage: config.targetLanguage,
-		blocks: sourceBlocks,
-	});
-	const renderedContent = renderMarkdown(translatedBlocks, renderMode);
-	const session = createInitialSession({
+	let session = createInitialSession({
 		sourceUri: document.uri,
 		translatedUri,
 		sourceContent,
 		sourceBlocks,
-		translatedBlocks,
-		renderedContent,
+		translatedBlocks: sourceBlocks.map((block) => ({
+			...block,
+			translatedText: '',
+		})),
+		renderedContent: sourceContent,
 		renderMode,
 		config,
 	});
@@ -61,23 +80,74 @@ export async function translateCurrentFile(provider: TranslatedDocumentProvider)
 
 	provider.setSession(session);
 	refresh.request();
-	refresh.flush();
-	refresh.dispose();
 
-	const translatedDocument = await vscode.workspace.openTextDocument(translatedUri);
+	await (dependencies.openTranslatedDocument ?? openTranslatedDocument)(translatedUri);
+
+	showDocumentSizeMessage(sourceContent.length);
+
+	const translator = dependencies.createProvider?.() ?? new GoogleFreeTranslator();
+	const cache = dependencies.createCache?.() ?? new TranslationCache(globalState);
+	const scheduler = new TranslationScheduler(translator, cache, {
+		concurrency: translationConcurrency,
+		onProgress: (progress) => {
+			const renderedContent = renderMarkdown(progress.blocks, renderMode);
+			session = replaceTranslatedBlocks(session, progress.blocks, renderedContent);
+			provider.setSession(session);
+			refresh.request();
+		},
+	});
+
+	try {
+		const result = await scheduler.translate({
+			sourceLanguage: config.sourceLanguage,
+			targetLanguage: config.targetLanguage,
+			blocks: sourceBlocks,
+		});
+		const renderedContent = renderMarkdown(result.blocks, renderMode);
+		session = replaceTranslatedBlocks(session, result.blocks, renderedContent);
+		provider.setSession(session);
+		refresh.request();
+		refresh.flush();
+
+		if (result.failedBlockCount > 0) {
+			vscode.window.showWarningMessage(`Markdown translation completed with ${result.failedBlockCount} failed block(s).`);
+		} else {
+			vscode.window.showInformationMessage('Markdown translation completed.');
+		}
+	} catch (error) {
+		refresh.flush();
+		vscode.window.showErrorMessage(
+			`Markdown translation failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	} finally {
+		refresh.dispose();
+	}
+}
+
+async function openTranslatedDocument(uri: vscode.Uri): Promise<void> {
+	const translatedDocument = await vscode.workspace.openTextDocument(uri);
 	await vscode.window.showTextDocument(translatedDocument, {
 		viewColumn: vscode.ViewColumn.Beside,
 		preview: false,
 		preserveFocus: false,
 	});
+}
 
-	vscode.window.showInformationMessage('Markdown translation view opened.');
+function showDocumentSizeMessage(characterCount: number): void {
+	if (characterCount > largeDocumentMaxCharacters) {
+		vscode.window.showWarningMessage('This Markdown file is large, so translation may take a while.');
+		return;
+	}
+
+	if (characterCount > smallDocumentMaxCharacters) {
+		vscode.window.showInformationMessage('Translating Markdown blocks in batches.');
+	}
 }
 
 export function registerTranslateCurrentFileCommand(
 	context: vscode.ExtensionContext,
 	provider: TranslatedDocumentProvider,
 ): void {
-	const disposable = vscode.commands.registerCommand(translateCommandId, () => translateCurrentFile(provider));
+	const disposable = vscode.commands.registerCommand(translateCommandId, () => translateCurrentFile(provider, context.globalState));
 	context.subscriptions.push(disposable);
 }

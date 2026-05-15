@@ -1,11 +1,12 @@
-import type { TranslatedMarkdownBlock } from '../../markdown/block';
-import type { MarkdownTranslator, TranslateBlocksRequest } from '../types';
+import type { TranslateInput, TranslateResult, TranslatorProvider } from '../types';
 
-export class MockTranslator implements MarkdownTranslator {
-	async translateBlocks(request: TranslateBlocksRequest): Promise<TranslatedMarkdownBlock[]> {
-		return request.blocks.map((block) => ({
-			...block,
-			translatedText: block.translatable ? `[${request.targetLanguage}] ${block.text}` : '',
-		}));
+export class MockTranslator implements TranslatorProvider {
+	readonly id = 'mock';
+	readonly maxTextLength = 5_000;
+
+	async translate(input: TranslateInput): Promise<TranslateResult> {
+		return {
+			text: `[${input.targetLanguage}] ${input.text}`,
+		};
 	}
 }

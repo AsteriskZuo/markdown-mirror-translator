@@ -1,8 +1,36 @@
 import * as assert from 'assert';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { isTranslatableMarkdownDocument, translateCurrentFile } from '../commands/translateCurrentFile';
+import { getTranslatedFileUri, saveTranslatedFileForUri } from '../commands/saveTranslatedFile';
 import { getConfig } from '../config';
 import { translatedDocumentScheme, TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
-import { createInitialSession } from '../translationSession';
+import type { TranslateInput, TranslateResult, TranslatorProvider } from '../translation/types';
+import { createInitialSession, replaceTranslatedBlocks } from '../translationSession';
+
+function createTestMemento(): vscode.Memento {
+	return {
+		get: <T>(_key: string, defaultValue?: T) => defaultValue,
+		update: async () => undefined,
+		keys: () => [],
+	};
+}
+
+class TestProvider implements TranslatorProvider {
+	readonly id = 'test';
+	readonly maxTextLength = 10_000;
+
+	async translate(input: TranslateInput): Promise<TranslateResult> {
+		return { text: `[${input.targetLanguage}] ${input.text}` };
+	}
+}
+
+async function createTempMarkdownUri(fileName: string): Promise<vscode.Uri> {
+	const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mmt-test-'));
+	return vscode.Uri.file(path.join(directory, fileName));
+}
 
 suite('Markdown Mirror Translator shell', () => {
 	test('getConfig reads default extension settings', () => {
@@ -38,7 +66,9 @@ suite('Markdown Mirror Translator shell', () => {
 				kind: 'heading' as const,
 				source: '# Hello\n',
 				text: 'Hello',
+				hash: 'hash-0',
 				translatable: true,
+				state: 'translated' as const,
 				protectedInlines: [],
 			},
 		];
@@ -70,6 +100,42 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.ok(session.updatedAt > 0);
 	});
 
+	test('replaceTranslatedBlocks updates translated blocks and rendered content', () => {
+		const sourceUri = vscode.Uri.file('/workspace/README.md');
+		const translatedUri = vscode.Uri.from({
+			scheme: 'markdown-mirror-translator',
+			path: '/README.zh-CN.md',
+		});
+		const sourceBlocks = [
+			{
+				id: 'block-0',
+				kind: 'paragraph' as const,
+				source: 'Hello\n',
+				text: 'Hello',
+				hash: 'hash-0',
+				translatable: true,
+				state: 'pending' as const,
+				protectedInlines: [],
+			},
+		];
+		const initial = createInitialSession({
+			sourceUri,
+			translatedUri,
+			sourceContent: 'Hello\n',
+			sourceBlocks,
+			renderedContent: 'Hello\n',
+			renderMode: 'translated',
+			config: getConfig(),
+		});
+		const translated = [{ ...sourceBlocks[0], translatedText: '你好', state: 'translated' as const }];
+
+		const updated = replaceTranslatedBlocks(initial, translated, '你好\n');
+
+		assert.deepStrictEqual(updated.translatedBlocks, translated);
+		assert.strictEqual(updated.renderedContent, '你好\n');
+		assert.ok(updated.updatedAt >= initial.updatedAt);
+	});
+
 	test('TranslatedDocumentProvider reuses one translated URI per source URI', () => {
 		const provider = new TranslatedDocumentProvider();
 		const sourceUri = vscode.Uri.file('/workspace/README.md');
@@ -92,7 +158,9 @@ suite('Markdown Mirror Translator shell', () => {
 				kind: 'heading' as const,
 				source: '# Hello\n',
 				text: 'Hello',
+				hash: 'hash-0',
 				translatable: true,
+				state: 'translated' as const,
 				protectedInlines: [],
 			},
 		];
@@ -112,35 +180,52 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.strictEqual(provider.provideTextDocumentContent(translatedUri), '# [zh-CN] Hello\n');
 	});
 
+	test('translate command rejects translated virtual documents as sources', () => {
+		assert.strictEqual(
+			isTranslatableMarkdownDocument({
+				uri: vscode.Uri.from({
+					scheme: translatedDocumentScheme,
+					path: '/README.zh-CN.md',
+				}),
+				languageId: 'markdown',
+				fileName: 'README.zh-CN.md',
+			}),
+			false,
+		);
+	});
+
 	test('translate command opens a reused virtual Markdown document with mock translated content', async () => {
+		const provider = new TranslatedDocumentProvider();
 		const sourceDocument = await vscode.workspace.openTextDocument({
 			content: '# Hello\n\nWorld\n',
 			language: 'markdown',
 		});
 
 		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
-		await vscode.commands.executeCommand('markdown-mirror-translator.translateCurrentFile');
+		await translateCurrentFile(provider, createTestMemento(), {
+			createProvider: () => new TestProvider(),
+			openTranslatedDocument: async () => undefined,
+		});
 
-		const firstTranslatedEditor = vscode.window.activeTextEditor;
-		assert.ok(firstTranslatedEditor);
-		assert.strictEqual(firstTranslatedEditor.document.uri.scheme, translatedDocumentScheme);
-		assert.strictEqual(firstTranslatedEditor.document.languageId, 'markdown');
-		assert.strictEqual(firstTranslatedEditor.document.getText(), '# [zh-CN] Hello\n\n[zh-CN] World\n');
-
-		const firstTranslatedUri = firstTranslatedEditor.document.uri.toString();
+		const firstTranslatedUri = provider.getTranslatedUri(sourceDocument.uri, 'zh-CN', false);
+		assert.strictEqual(firstTranslatedUri.scheme, translatedDocumentScheme);
+		assert.strictEqual(provider.provideTextDocumentContent(firstTranslatedUri), '# [zh-CN] Hello\n\n[zh-CN] World\n');
 
 		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
-		await vscode.commands.executeCommand('markdown-mirror-translator.translateCurrentFile');
+		await translateCurrentFile(provider, createTestMemento(), {
+			createProvider: () => new TestProvider(),
+			openTranslatedDocument: async () => undefined,
+		});
 
-		const secondTranslatedEditor = vscode.window.activeTextEditor;
-		assert.ok(secondTranslatedEditor);
-		assert.strictEqual(secondTranslatedEditor.document.uri.toString(), firstTranslatedUri);
-		assert.strictEqual(secondTranslatedEditor.document.getText(), '# [zh-CN] Hello\n\n[zh-CN] World\n');
+		const secondTranslatedUri = provider.getTranslatedUri(sourceDocument.uri, 'zh-CN', false);
+		assert.strictEqual(secondTranslatedUri.toString(), firstTranslatedUri.toString());
+		assert.strictEqual(provider.provideTextDocumentContent(secondTranslatedUri), '# [zh-CN] Hello\n\n[zh-CN] World\n');
 
 		await vscode.commands.executeCommand('markdown-mirror-translator.saveTranslatedFile');
 	});
 
 	test('translate command renders bilingual Markdown when setting is enabled', async () => {
+		const provider = new TranslatedDocumentProvider();
 		const config = vscode.workspace.getConfiguration('markdownMirrorTranslator');
 		await config.update('bilingual', true, vscode.ConfigurationTarget.Global);
 
@@ -151,17 +236,77 @@ suite('Markdown Mirror Translator shell', () => {
 			});
 
 			await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
-			await vscode.commands.executeCommand('markdown-mirror-translator.translateCurrentFile');
+			await translateCurrentFile(provider, createTestMemento(), {
+				createProvider: () => new TestProvider(),
+				openTranslatedDocument: async () => undefined,
+			});
 
-			const translatedEditor = vscode.window.activeTextEditor;
-			assert.ok(translatedEditor);
-			assert.strictEqual(translatedEditor.document.uri.scheme, translatedDocumentScheme);
+			const translatedUri = provider.getTranslatedUri(sourceDocument.uri, 'zh-CN', true);
+			assert.strictEqual(translatedUri.scheme, translatedDocumentScheme);
 			assert.strictEqual(
-				translatedEditor.document.getText(),
+				provider.provideTextDocumentContent(translatedUri),
 				'# Hello\n\n# [zh-CN] Hello\n\nWorld\n\n[zh-CN] World\n',
 			);
 		} finally {
 			await config.update('bilingual', undefined, vscode.ConfigurationTarget.Global);
 		}
+	});
+
+	test('getTranslatedFileUri creates target-language filenames next to source file', () => {
+		const sourceUri = vscode.Uri.file('/workspace/README.md');
+
+		assert.strictEqual(
+			getTranslatedFileUri(sourceUri, 'zh-CN', false).fsPath,
+			vscode.Uri.file('/workspace/README.zh-CN.md').fsPath,
+		);
+		assert.strictEqual(
+			getTranslatedFileUri(sourceUri, 'zh-CN', true).fsPath,
+			vscode.Uri.file('/workspace/README.bilingual.zh-CN.md').fsPath,
+		);
+	});
+
+	test('save command writes translated Markdown beside the source file', async () => {
+		const provider = new TranslatedDocumentProvider();
+		const sourceUri = await createTempMarkdownUri(`mmt-${Date.now()}.md`);
+		const targetUri = getTranslatedFileUri(sourceUri, 'zh-CN', false);
+
+		await vscode.workspace.fs.writeFile(sourceUri, Buffer.from('# Hello\n', 'utf8'));
+		const sourceDocument = await vscode.workspace.openTextDocument(sourceUri);
+		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
+		await translateCurrentFile(provider, createTestMemento(), {
+			createProvider: () => new TestProvider(),
+			openTranslatedDocument: async () => undefined,
+		});
+		const translatedUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+
+		await saveTranslatedFileForUri(provider, translatedUri, {
+			confirmOverwrite: async () => true,
+		});
+
+		const saved = Buffer.from(await vscode.workspace.fs.readFile(targetUri)).toString('utf8');
+		assert.strictEqual(saved, '# [zh-CN] Hello\n');
+	});
+
+	test('save command does not overwrite when confirmation is declined', async () => {
+		const provider = new TranslatedDocumentProvider();
+		const sourceUri = await createTempMarkdownUri(`mmt-overwrite-${Date.now()}.md`);
+		const targetUri = getTranslatedFileUri(sourceUri, 'zh-CN', false);
+
+		await vscode.workspace.fs.writeFile(sourceUri, Buffer.from('# Hello\n', 'utf8'));
+		await vscode.workspace.fs.writeFile(targetUri, Buffer.from('existing\n', 'utf8'));
+		const sourceDocument = await vscode.workspace.openTextDocument(sourceUri);
+		await vscode.window.showTextDocument(sourceDocument, vscode.ViewColumn.One);
+		await translateCurrentFile(provider, createTestMemento(), {
+			createProvider: () => new TestProvider(),
+			openTranslatedDocument: async () => undefined,
+		});
+		const translatedUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+
+		await saveTranslatedFileForUri(provider, translatedUri, {
+			confirmOverwrite: async () => false,
+		});
+
+		const saved = Buffer.from(await vscode.workspace.fs.readFile(targetUri)).toString('utf8');
+		assert.strictEqual(saved, 'existing\n');
 	});
 });

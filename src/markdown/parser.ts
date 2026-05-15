@@ -1,4 +1,7 @@
+import * as crypto from 'crypto';
 import type { MarkdownBlock, MarkdownBlockKind, ProtectedInlineToken } from './block';
+
+export const PARSER_VERSION = 'markdown-mirror-translator-parser-v1';
 
 const inlinePatterns = [
 	/`[^`\n]+`/g,
@@ -7,6 +10,17 @@ const inlinePatterns = [
 
 const markdownDestinationPattern = /(!?\[[^\]]*])\(([^)\s]+)(\s+"[^"]*")?\)/g;
 const urlPattern = /https?:\/\/[^\s)]+/g;
+
+function hashBlock(kind: MarkdownBlockKind, text: string, source: string, protectedInlines: ProtectedInlineToken[]): string {
+	const canonical = JSON.stringify({
+		parserVersion: PARSER_VERSION,
+		kind,
+		text,
+		source,
+		protectedInlines,
+	});
+	return crypto.createHash('sha256').update(canonical).digest('hex');
+}
 
 function createBlock(
 	index: number,
@@ -21,7 +35,9 @@ function createBlock(
 		kind,
 		source,
 		text,
+		hash: hashBlock(kind, text, source, protectedInlines),
 		translatable,
+		state: translatable ? 'pending' : 'skipped',
 		protectedInlines,
 	};
 }

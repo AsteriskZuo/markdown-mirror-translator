@@ -74,6 +74,8 @@ If verification cannot be completed, say exactly what was not verified and why.
 
 This VS Code extension uses `vscode-test` for `npm test`. Run `npm test` with escalated permissions directly for baseline or verification because it may need network access and VS Code/Electron runtime startup. Prefer the narrow persistent approval prefix `["npm", "test"]`.
 
+When running `npm test`, do not stop to ask the user for confirmation in chat. Request or use the tool-level escalated permission directly, with the narrow prefix `["npm", "test"]`, and continue from the command result.
+
 ## Documentation
 
 - Keep long-term agent rules in `AGENTS.md`.

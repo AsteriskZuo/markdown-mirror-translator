@@ -62,4 +62,17 @@ suite('Markdown parser', () => {
 			],
 		);
 	});
+
+	test('adds parser version, hash, and initial state metadata', () => {
+		const blocks = parseMarkdownBlocks('# Hello\n\n```ts\nconst value = 1;\n```\n');
+
+		assert.strictEqual(typeof blocks[0].hash, 'string');
+		assert.strictEqual(blocks[0].hash.length, 64);
+		assert.strictEqual(blocks[0].state, 'pending');
+		assert.strictEqual(blocks[2].state, 'skipped');
+
+		const repeated = parseMarkdownBlocks('# Hello\n\n```ts\nconst value = 1;\n```\n');
+		assert.strictEqual(blocks[0].hash, repeated[0].hash);
+		assert.strictEqual(blocks[2].hash, repeated[2].hash);
+	});
 });

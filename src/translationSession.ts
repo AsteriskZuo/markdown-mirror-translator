@@ -46,3 +46,16 @@ export function replaceRenderedContent(session: TranslationSession, renderedCont
 		updatedAt: Date.now(),
 	};
 }
+
+export function replaceTranslatedBlocks(
+	session: TranslationSession,
+	translatedBlocks: TranslatedMarkdownBlock[],
+	renderedContent: string,
+): TranslationSession {
+	return {
+		...session,
+		translatedBlocks,
+		renderedContent,
+		updatedAt: Date.now(),
+	};
+}
