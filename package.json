@@ -20,12 +20,16 @@
       {
         "command": "markdown-mirror-translator.translateCurrentFile",
         "title": "Markdown Mirror Translator: Translate Current File",
-        "category": "Markdown Mirror Translator"
+        "category": "Markdown Mirror Translator",
+        "icon": "$(globe)",
+        "shortTitle": ""
       },
       {
         "command": "markdown-mirror-translator.saveTranslatedFile",
         "title": "Markdown Mirror Translator: Save Translated File",
-        "category": "Markdown Mirror Translator"
+        "category": "Markdown Mirror Translator",
+        "icon": "$(save)",
+        "shortTitle": ""
       }
     ],
     "configuration": {

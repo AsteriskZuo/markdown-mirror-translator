@@ -10,6 +10,13 @@ import { translatedDocumentScheme, TranslatedDocumentProvider } from '../documen
 import type { TranslateInput, TranslateResult, TranslatorProvider } from '../translation/types';
 import { createInitialSession, replaceTranslatedBlocks } from '../translationSession';
 
+type ExtensionManifestCommand = {
+	command: string;
+	icon?: string;
+	shortTitle?: string;
+	title: string;
+};
+
 function createTestMemento(): vscode.Memento {
 	return {
 		get: <T>(_key: string, defaultValue?: T) => defaultValue,
@@ -32,6 +39,15 @@ async function createTempMarkdownUri(fileName: string): Promise<vscode.Uri> {
 	return vscode.Uri.file(path.join(directory, fileName));
 }
 
+async function readManifestCommands(): Promise<ExtensionManifestCommand[]> {
+	const manifestPath = path.resolve(__dirname, '../../package.json');
+	const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+		contributes: { commands: ExtensionManifestCommand[] };
+	};
+
+	return manifest.contributes.commands;
+}
+
 suite('Markdown Mirror Translator shell', () => {
 	test('getConfig reads default extension settings', () => {
 		const config = getConfig();
@@ -52,6 +68,24 @@ suite('Markdown Mirror Translator shell', () => {
 		const commands = await vscode.commands.getCommands(true);
 		assert.ok(commands.includes('markdown-mirror-translator.translateCurrentFile'));
 		assert.ok(commands.includes('markdown-mirror-translator.saveTranslatedFile'));
+	});
+
+	test('editor title commands use icons with tooltip titles', async () => {
+		const commands = await readManifestCommands();
+		const translateCommand = commands.find(
+			(command) => command.command === 'markdown-mirror-translator.translateCurrentFile',
+		);
+		const saveCommand = commands.find((command) => command.command === 'markdown-mirror-translator.saveTranslatedFile');
+
+		assert.ok(translateCommand);
+		assert.strictEqual(translateCommand.icon, '$(globe)');
+		assert.strictEqual(translateCommand.shortTitle, '');
+		assert.strictEqual(translateCommand.title, 'Markdown Mirror Translator: Translate Current File');
+
+		assert.ok(saveCommand);
+		assert.strictEqual(saveCommand.icon, '$(save)');
+		assert.strictEqual(saveCommand.shortTitle, '');
+		assert.strictEqual(saveCommand.title, 'Markdown Mirror Translator: Save Translated File');
 	});
 
 	test('createInitialSession stores block state and rendered content', () => {
