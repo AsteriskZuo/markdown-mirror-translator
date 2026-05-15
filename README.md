@@ -179,28 +179,10 @@ The following links are provided as related tools in the Markdown translation an
 - [Markdown Preview Enhanced](https://marketplace.visualstudio.com/items?itemName=shd101wyy.markdown-preview-enhanced)
 - [Immersive Translate](https://immersivetranslate.com/en/)
 
-## Development
+## Contributing
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run checks:
-
-```bash
-npm run check-types
-npm run lint
-npm run compile
-```
-
-Run the VS Code extension test suite:
-
-```bash
-npm test
-```
+This README is user-facing documentation. Development setup, local debugging, testing, and contribution workflow are documented in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-No license has been declared yet.
+MIT.

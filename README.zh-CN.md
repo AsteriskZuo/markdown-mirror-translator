@@ -179,28 +179,10 @@ Provider 被隔离在内部接口之后。后续可以增加其他 Provider，�
 - [Markdown Preview Enhanced](https://marketplace.visualstudio.com/items?itemName=shd101wyy.markdown-preview-enhanced)
 - [Immersive Translate](https://immersivetranslate.com/en/)
 
-## 开发
+## 参与贡献
 
-安装依赖：
-
-```bash
-npm install
-```
-
-运行检查：
-
-```bash
-npm run check-types
-npm run lint
-npm run compile
-```
-
-运行 VS Code extension 测试：
-
-```bash
-npm test
-```
+本文档是面向使用者的说明文档。开发环境配置、本地调试、测试和贡献流程请见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ## License
 
-当前尚未声明 license。
+MIT。
