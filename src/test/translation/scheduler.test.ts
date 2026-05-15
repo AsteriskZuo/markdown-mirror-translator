@@ -89,6 +89,25 @@ suite('Translation scheduler', () => {
 		assert.strictEqual(result.blocks[1].state, 'translated');
 	});
 
+	test('skips translation when source and target languages match', async () => {
+		const provider = new RecordingProvider();
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		const result = await scheduler.translate({
+			sourceLanguage: 'zh-CN',
+			targetLanguage: 'zh-cn',
+			blocks: [sourceBlock({ id: 'block-1', text: '你好', hash: 'hash-same-language' })],
+		});
+
+		assert.strictEqual(provider.inputs.length, 0);
+		assert.strictEqual(result.failedBlockCount, 0);
+		assert.strictEqual(result.blocks[0].translatedText, '你好');
+		assert.strictEqual(result.blocks[0].state, 'translated');
+	});
+
 	test('splits long text and limits concurrency', async () => {
 		const provider = new RecordingProvider();
 		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {

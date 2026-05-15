@@ -33,6 +33,7 @@ export class TranslationScheduler {
 
 	async translate(input: TranslationSchedulerInput): Promise<TranslationSchedulerResult> {
 		const output = input.blocks.map(createInitialTranslatedBlock);
+		const shouldSkipProvider = isSameLanguage(input.sourceLanguage, input.targetLanguage);
 		const translatableIndexes = output
 			.map((block, index) => ({ block, index }))
 			.filter(({ block }) => block.translatable);
@@ -47,6 +48,13 @@ export class TranslationScheduler {
 				const { index, block } = item;
 				output[index] = { ...block, state: 'translating' };
 				this.emitProgress(output, completedBlockCount, failedBlockCount);
+
+				if (shouldSkipProvider) {
+					output[index] = { ...block, translatedText: block.text, state: 'translated' };
+					completedBlockCount += 1;
+					this.emitProgress(output, completedBlockCount, failedBlockCount);
+					continue;
+				}
 
 				const cacheKey = {
 					provider: this.provider.id,
@@ -126,6 +134,17 @@ function createInitialTranslatedBlock(block: MarkdownBlock): TranslatedMarkdownB
 		state: block.state,
 		translatedText: '',
 	};
+}
+
+function isSameLanguage(sourceLanguage: string, targetLanguage: string): boolean {
+	const normalizedSourceLanguage = normalizeLanguageCode(sourceLanguage);
+	const normalizedTargetLanguage = normalizeLanguageCode(targetLanguage);
+
+	return normalizedSourceLanguage.length > 0 && normalizedSourceLanguage === normalizedTargetLanguage;
+}
+
+function normalizeLanguageCode(language: string): string {
+	return language.trim().toLowerCase();
 }
 
 function splitText(text: string, maxTextLength: number): string[] {
