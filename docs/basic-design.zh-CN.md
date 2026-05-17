@@ -217,6 +217,7 @@ Markdown Mirror Translator: Save Translated File
 - image URL
 - frontmatter 整体
 - HTML block 和 inline HTML 整体
+- pipe table 分隔行和列结构
 
 可以翻译：
 
@@ -224,7 +225,7 @@ Markdown Mirror Translator: Save Translated File
 - 段落文本
 - 列表项文本
 - 引用块文本
-- 表格单元格文本
+- 表格行文本
 - Markdown link label
 - image alt text
 

@@ -11,7 +11,7 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 - 通过命令面板或编辑器标题栏按钮翻译当前 Markdown 文件。
 - 左侧保留原始 Markdown 文件，右侧打开只读译文 Markdown 文档。
 - 支持纯译文 Markdown 和双语 Markdown 两种输出模式。
-- 尽量保护 fenced code block、inline code、URL、frontmatter、HTML block 等 Markdown 结构。
+- 尽量保护 fenced code block、inline code、URL、frontmatter、HTML block、pipe table 等 Markdown 结构。
 - 可翻译标题、段落、列表项、引用块、表格行、链接文字和图片 alt 文本等内容。
 - 默认使用 `google-free` 翻译 Provider，不需要 API Key。
 - 基于 block hash 缓存译文，减少重复请求。
@@ -147,6 +147,7 @@ This is a document.
 - Image URL
 - Frontmatter block
 - HTML block 和 inline HTML
+- Pipe table 分隔行和列结构
 
 尽量翻译：
 

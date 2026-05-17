@@ -11,7 +11,7 @@ It is not a Markdown preview renderer. It does not replace VS Code's built-in Ma
 - Translate the current Markdown file from the command palette or editor title button.
 - Keep the original Markdown file on the left and open a read-only translated Markdown document on the right.
 - Show either translated-only Markdown or adjacent bilingual Markdown.
-- Preserve common Markdown structures such as fenced code blocks, inline code, URLs, frontmatter, and HTML blocks.
+- Preserve common Markdown structures such as fenced code blocks, inline code, URLs, frontmatter, HTML blocks, and pipe tables.
 - Translate headings, paragraphs, list items, block quotes, table rows, link labels, and image alt text where possible.
 - Use the default `google-free` translation provider without requiring an API key.
 - Cache translated blocks to reduce repeated translation requests.
@@ -147,6 +147,7 @@ Protected by default:
 - Image URLs
 - Frontmatter blocks
 - HTML blocks and inline HTML
+- Pipe table separators and column structure
 
 Translatable where possible:
 
