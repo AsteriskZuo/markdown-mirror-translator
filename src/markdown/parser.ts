@@ -171,7 +171,26 @@ function isPipeTableRow(line: string): boolean {
 
 function parsePipeCells(line: string): string[] {
 	const withoutNewline = line.replace(/\r?\n$/, '').trim();
-	return withoutNewline.slice(1, -1).split('|').map((cell) => cell.trim());
+	const cells: string[] = [];
+	let currentCell = '';
+	let isEscaped = false;
+
+	for (const character of withoutNewline.slice(1, -1)) {
+		if (character === '|' && !isEscaped) {
+			cells.push(currentCell.trim());
+			currentCell = '';
+			continue;
+		}
+
+		currentCell += character;
+		isEscaped = character === '\\' && !isEscaped;
+		if (character !== '\\') {
+			isEscaped = false;
+		}
+	}
+
+	cells.push(currentCell.trim());
+	return cells;
 }
 
 function isSeparatorCell(cell: string): boolean {

@@ -78,8 +78,20 @@ function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 	return ensureTrailingNewline(translatedText);
 }
 
-function joinBilingualPairs(pairs: string[]): string {
-	return pairs.filter((pair) => pair.length > 0).join('\n');
+function renderBilingualBlock(block: TranslatedMarkdownBlock): string {
+	if (!block.translatable) {
+		if (block.kind === 'blank') {
+			return '';
+		}
+
+		return block.source;
+	}
+
+	if (block.kind === 'listItem') {
+		return `${ensureTrailingNewline(block.source).trimEnd()}\n${renderTranslatedBlock(block).trimEnd()}\n`;
+	}
+
+	return `${ensureTrailingNewline(block.source).trimEnd()}\n\n${renderTranslatedBlock(block).trimEnd()}\n`;
 }
 
 export function renderMarkdown(blocks: TranslatedMarkdownBlock[], mode: RenderMode): string {
@@ -87,17 +99,29 @@ export function renderMarkdown(blocks: TranslatedMarkdownBlock[], mode: RenderMo
 		return blocks.map(renderTranslatedBlock).join('');
 	}
 
-	const pairs = blocks.map((block) => {
-		if (!block.translatable) {
-			if (block.kind === 'blank') {
-				return '';
-			}
+	let rendered = '';
+	let previousRenderedKind: TranslatedMarkdownBlock['kind'] | undefined;
+	let pendingBlankSeparator = false;
 
-			return block.source;
+	for (const block of blocks) {
+		const renderedBlock = renderBilingualBlock(block);
+
+		if (renderedBlock.length === 0) {
+			if (block.kind === 'blank' && rendered.length > 0) {
+				pendingBlankSeparator = true;
+			}
+			continue;
 		}
 
-		return `${ensureTrailingNewline(block.source).trimEnd()}\n\n${renderTranslatedBlock(block).trimEnd()}\n`;
-	});
+		const joinsConsecutiveListItems = previousRenderedKind === 'listItem' && block.kind === 'listItem';
+		if (rendered.length > 0 && (pendingBlankSeparator || !joinsConsecutiveListItems)) {
+			rendered += '\n';
+		}
 
-	return joinBilingualPairs(pairs);
+		rendered += renderedBlock;
+		previousRenderedKind = block.kind;
+		pendingBlankSeparator = false;
+	}
+
+	return rendered;
 }

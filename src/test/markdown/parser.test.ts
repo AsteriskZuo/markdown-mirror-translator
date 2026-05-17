@@ -64,6 +64,28 @@ suite('Markdown parser', () => {
 		});
 	});
 
+	test('parses escaped pipes inside table cells without splitting the table', () => {
+		const blocks = parseMarkdownBlocks("| Name | Type | Required |\n| --- | --- | --- |\n| `type` | `'easemob' \\| 'agora'` | No |\n| `logHandler` | `Function` | No |\n");
+
+		assert.strictEqual(blocks.length, 1);
+		assert.strictEqual(blocks[0].kind, 'table');
+		assert.strictEqual(blocks[0].text, "Name | Type | Required\n__MMT_INLINE_0__ | __MMT_INLINE_1__ | No\n__MMT_INLINE_2__ | __MMT_INLINE_3__ | No");
+		assert.deepStrictEqual(blocks[0].table, {
+			header: ['Name', 'Type', 'Required'],
+			alignments: ['default', 'default', 'default'],
+			rows: [
+				['__MMT_INLINE_0__', '__MMT_INLINE_1__', 'No'],
+				['__MMT_INLINE_2__', '__MMT_INLINE_3__', 'No'],
+			],
+		});
+		assert.deepStrictEqual(blocks[0].protectedInlines, [
+			{ token: '__MMT_INLINE_0__', value: '`type`' },
+			{ token: '__MMT_INLINE_1__', value: "`'easemob' \\| 'agora'`" },
+			{ token: '__MMT_INLINE_2__', value: '`logHandler`' },
+			{ token: '__MMT_INLINE_3__', value: '`Function`' },
+		]);
+	});
+
 	test('keeps non-table pipe rows as table row blocks', () => {
 		const blocks = parseMarkdownBlocks('| Name | Description |\n| API | Local pipeline |\n');
 

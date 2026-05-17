@@ -70,6 +70,28 @@ suite('Markdown renderer', () => {
 		assert.strictEqual(rendered, '# Hello\n\n# [zh-CN] Hello\n\nWorld\n\n[zh-CN] World\n');
 	});
 
+	test('renders consecutive bilingual list items without paragraph gaps', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					kind: 'listItem',
+					source: '- Alpha\n',
+					text: 'Alpha',
+					translatedText: '阿尔法',
+				}),
+				block({
+					kind: 'listItem',
+					source: '- Beta\n',
+					text: 'Beta',
+					translatedText: '贝塔',
+				}),
+			],
+			'bilingual',
+		);
+
+		assert.strictEqual(rendered, '- Alpha\n- 阿尔法\n- Beta\n- 贝塔\n');
+	});
+
 	test('renders failed translatable blocks as their original source', () => {
 		const rendered = renderMarkdown(
 			[
