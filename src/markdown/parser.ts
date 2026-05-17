@@ -10,6 +10,7 @@ const inlinePatterns = [
 
 const markdownDestinationPattern = /(!?\[[^\]]*])\(([^)\s]+)(\s+"[^"]*")?\)/g;
 const urlPattern = /https?:\/\/[^\s)]+/g;
+const listItemPrefixPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/;
 
 function hashBlock(kind: MarkdownBlockKind, text: string, source: string, protectedInlines: ProtectedInlineToken[]): string {
 	const canonical = JSON.stringify({
@@ -82,7 +83,7 @@ function stripPrefix(line: string, kind: MarkdownBlockKind): string {
 	}
 
 	if (kind === 'listItem') {
-		return withoutNewline.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '');
+		return withoutNewline.replace(listItemPrefixPattern, '');
 	}
 
 	if (kind === 'blockquote') {

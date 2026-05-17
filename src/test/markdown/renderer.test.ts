@@ -92,6 +92,28 @@ suite('Markdown renderer', () => {
 		assert.strictEqual(rendered, '- Alpha\n- 阿尔法\n- Beta\n- 贝塔\n');
 	});
 
+	test('renders task list checkboxes as list structure before translated text', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					kind: 'listItem',
+					source: '  * [x] hello\n',
+					text: 'hello',
+					translatedText: '你好',
+				}),
+				block({
+					kind: 'listItem',
+					source: '  2. [ ] world\n',
+					text: 'world',
+					translatedText: '世界',
+				}),
+			],
+			'bilingual',
+		);
+
+		assert.strictEqual(rendered, '  * [x] hello\n  * [x] 你好\n  2. [ ] world\n  2. [ ] 世界\n');
+	});
+
 	test('renders failed translatable blocks as their original source', () => {
 		const rendered = renderMarkdown(
 			[

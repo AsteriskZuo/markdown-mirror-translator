@@ -50,6 +50,18 @@ suite('Markdown parser', () => {
 		assert.strictEqual(blocks[4].translatable, false);
 	});
 
+	test('treats task list checkboxes as list item structure', () => {
+		const blocks = parseMarkdownBlocks('  * [x] hello\n  2. [ ] world\n');
+
+		assert.deepStrictEqual(
+			blocks.map((block) => ({ kind: block.kind, source: block.source, text: block.text })),
+			[
+				{ kind: 'listItem', source: '  * [x] hello\n', text: 'hello' },
+				{ kind: 'listItem', source: '  2. [ ] world\n', text: 'world' },
+			],
+		);
+	});
+
 	test('parses pipe tables as structured table blocks', () => {
 		const blocks = parseMarkdownBlocks('| Name | Description |\n| --- | --- |\n| API | Local pipeline |\n');
 

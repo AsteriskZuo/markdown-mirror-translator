@@ -1,5 +1,7 @@
 import type { MarkdownTableAlignment, RenderMode, TranslatedMarkdownBlock } from './block';
 
+const listItemPrefixPattern = /^(\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)/;
+
 function restoreInlineTokens(text: string, block: TranslatedMarkdownBlock): string {
 	return block.protectedInlines.reduce(
 		(current, protectedInline) => current.split(protectedInline.token).join(protectedInline.value),
@@ -66,7 +68,7 @@ function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 	}
 
 	if (block.kind === 'listItem') {
-		const prefix = block.source.match(/^(\s*(?:[-*+]|\d+[.)])\s+)/)?.[1] ?? '';
+		const prefix = block.source.match(listItemPrefixPattern)?.[1] ?? '';
 		return ensureTrailingNewline(`${prefix}${translatedText}`);
 	}
 
