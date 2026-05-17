@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
-import type { MarkdownBlock, MarkdownBlockKind, ProtectedInlineToken } from './block';
+import type { MarkdownBlock, MarkdownBlockKind, MarkdownTable, MarkdownTableAlignment, ProtectedInlineToken } from './block';
 
-export const PARSER_VERSION = 'markdown-mirror-translator-parser-v1';
+export const PARSER_VERSION = 'markdown-mirror-translator-parser-v2';
 
 const inlinePatterns = [
 	/`[^`\n]+`/g,
@@ -29,6 +29,7 @@ function createBlock(
 	text: string,
 	translatable: boolean,
 	protectedInlines: ProtectedInlineToken[] = [],
+	table?: MarkdownTable,
 ): MarkdownBlock {
 	return {
 		id: `block-${index}`,
@@ -39,15 +40,16 @@ function createBlock(
 		translatable,
 		state: translatable ? 'pending' : 'skipped',
 		protectedInlines,
+		table,
 	};
 }
 
-function protectInlineText(text: string): { text: string; protectedInlines: ProtectedInlineToken[] } {
+function protectInlineText(text: string, tokenOffset = 0): { text: string; protectedInlines: ProtectedInlineToken[] } {
 	const protectedInlines: ProtectedInlineToken[] = [];
 	let protectedText = text.replace(
 		markdownDestinationPattern,
 		(_value: string, label: string, destination: string, title: string | undefined) => {
-			const token = `__MMT_INLINE_${protectedInlines.length}__`;
+			const token = `__MMT_INLINE_${protectedInlines.length + tokenOffset}__`;
 			protectedInlines.push({ token, value: destination });
 			return `${label}(${token}${title ?? ''})`;
 		},
@@ -55,7 +57,7 @@ function protectInlineText(text: string): { text: string; protectedInlines: Prot
 
 	for (const pattern of inlinePatterns) {
 		protectedText = protectedText.replace(pattern, (value: string) => {
-			const token = `__MMT_INLINE_${protectedInlines.length}__`;
+			const token = `__MMT_INLINE_${protectedInlines.length + tokenOffset}__`;
 			protectedInlines.push({ token, value });
 			return token;
 		});
@@ -64,7 +66,7 @@ function protectInlineText(text: string): { text: string; protectedInlines: Prot
 	protectedText = protectedText.replace(urlPattern, (value: string) => {
 		const trailingPunctuation = value.match(/[.,;:!?]+$/)?.[0] ?? '';
 		const url = trailingPunctuation ? value.slice(0, -trailingPunctuation.length) : value;
-		const token = `__MMT_INLINE_${protectedInlines.length}__`;
+		const token = `__MMT_INLINE_${protectedInlines.length + tokenOffset}__`;
 		protectedInlines.push({ token, value: url });
 		return `${token}${trailingPunctuation}`;
 	});
@@ -163,6 +165,93 @@ function consumeFencedCode(lines: string[], startIndex: number): { source: strin
 	};
 }
 
+function isPipeTableRow(line: string): boolean {
+	return /^\|.*\|\s*$/.test(line.replace(/\r?\n$/, ''));
+}
+
+function parsePipeCells(line: string): string[] {
+	const withoutNewline = line.replace(/\r?\n$/, '').trim();
+	return withoutNewline.slice(1, -1).split('|').map((cell) => cell.trim());
+}
+
+function isSeparatorCell(cell: string): boolean {
+	return /^:?-{3,}:?$/.test(cell.replace(/\s+/g, ''));
+}
+
+function parseAlignment(separatorCell: string): MarkdownTableAlignment {
+	const normalized = separatorCell.replace(/\s+/g, '');
+	const startsWithColon = normalized.startsWith(':');
+	const endsWithColon = normalized.endsWith(':');
+
+	if (startsWithColon && endsWithColon) {
+		return 'center';
+	}
+
+	if (startsWithColon) {
+		return 'left';
+	}
+
+	if (endsWithColon) {
+		return 'right';
+	}
+
+	return 'default';
+}
+
+function consumeTable(lines: string[], startIndex: number): { source: string; text: string; table: MarkdownTable; protectedInlines: ProtectedInlineToken[]; nextIndex: number } | undefined {
+	const headerLine = lines[startIndex];
+	const separatorLine = lines[startIndex + 1];
+
+	if (!headerLine || !separatorLine || !isPipeTableRow(headerLine) || !isPipeTableRow(separatorLine)) {
+		return undefined;
+	}
+
+	const headerCells = parsePipeCells(headerLine);
+	const separatorCells = parsePipeCells(separatorLine);
+
+	if (
+		headerCells.length === 0 ||
+		headerCells.length !== separatorCells.length ||
+		!separatorCells.every(isSeparatorCell)
+	) {
+		return undefined;
+	}
+
+	let nextIndex = startIndex + 2;
+	const bodyRows: string[][] = [];
+
+	while (nextIndex < lines.length && isPipeTableRow(lines[nextIndex])) {
+		const rowCells = parsePipeCells(lines[nextIndex]);
+		if (rowCells.length !== headerCells.length) {
+			break;
+		}
+		bodyRows.push(rowCells);
+		nextIndex += 1;
+	}
+
+	const protectedInlines: ProtectedInlineToken[] = [];
+	const protectCell = (cell: string): string => {
+		const protectedCell = protectInlineText(cell, protectedInlines.length);
+		protectedInlines.push(...protectedCell.protectedInlines);
+		return protectedCell.text;
+	};
+	const protectedHeader = headerCells.map(protectCell);
+	const protectedRows = bodyRows.map((row) => row.map(protectCell));
+	const text = [protectedHeader, ...protectedRows].map((row) => row.join(' | ')).join('\n');
+
+	return {
+		source: lines.slice(startIndex, nextIndex).join(''),
+		text,
+		table: {
+			header: protectedHeader,
+			alignments: separatorCells.map(parseAlignment),
+			rows: protectedRows,
+		},
+		protectedInlines,
+		nextIndex,
+	};
+}
+
 export function parseMarkdownBlocks(source: string): MarkdownBlock[] {
 	const lines = source.match(/[^\n]*\n|[^\n]+$/g) ?? [];
 	const blocks: MarkdownBlock[] = [];
@@ -181,6 +270,13 @@ export function parseMarkdownBlocks(source: string): MarkdownBlock[] {
 			const fencedCode = consumeFencedCode(lines, index);
 			blocks.push(createBlock(blocks.length, 'fencedCode', fencedCode.source, '', false));
 			index = fencedCode.nextIndex;
+			continue;
+		}
+
+		const table = consumeTable(lines, index);
+		if (table) {
+			blocks.push(createBlock(blocks.length, 'table', table.source, table.text, true, table.protectedInlines, table.table));
+			index = table.nextIndex;
 			continue;
 		}
 

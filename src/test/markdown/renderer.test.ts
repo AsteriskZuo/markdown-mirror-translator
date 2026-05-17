@@ -12,8 +12,10 @@ function block(input: Partial<TranslatedMarkdownBlock> & Pick<TranslatedMarkdown
 		translatable: input.translatable ?? true,
 		state: input.state ?? 'translated',
 		protectedInlines: input.protectedInlines ?? [],
+		table: input.table,
 		translatedText: input.translatedText,
 		errorMessage: input.errorMessage,
+		translatedTable: input.translatedTable,
 	};
 }
 
@@ -83,5 +85,58 @@ suite('Markdown renderer', () => {
 		);
 
 		assert.strictEqual(rendered, 'World\n');
+	});
+
+	test('renders translated tables from translated table cells', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					kind: 'table',
+					source: '| Name | Description |\n| --- | :---: |\n| API | Local pipeline |\n',
+					text: 'Name | Description\nAPI | Local pipeline',
+					table: {
+						header: ['Name', 'Description'],
+						alignments: ['default', 'center'],
+						rows: [['API', 'Local pipeline']],
+					},
+					translatedTable: {
+						header: ['名称', '描述'],
+						rows: [['接口', '本地流水线']],
+					},
+					translatedText: '',
+				}),
+			],
+			'translated',
+		);
+
+		assert.strictEqual(rendered, '| 名称 | 描述 |\n| --- | :---: |\n| 接口 | 本地流水线 |\n');
+	});
+
+	test('renders bilingual tables as source table followed by translated table', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					kind: 'table',
+					source: '| Name | Description |\n| --- | --- |\n| API | Local pipeline |\n',
+					text: 'Name | Description\nAPI | Local pipeline',
+					table: {
+						header: ['Name', 'Description'],
+						alignments: ['default', 'default'],
+						rows: [['API', 'Local pipeline']],
+					},
+					translatedTable: {
+						header: ['名称', '描述'],
+						rows: [['接口', '本地流水线']],
+					},
+					translatedText: '',
+				}),
+			],
+			'bilingual',
+		);
+
+		assert.strictEqual(
+			rendered,
+			'| Name | Description |\n| --- | --- |\n| API | Local pipeline |\n\n| 名称 | 描述 |\n| --- | --- |\n| 接口 | 本地流水线 |\n',
+		);
 	});
 });

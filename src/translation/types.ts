@@ -1,4 +1,4 @@
-import type { MarkdownBlock, TranslatedMarkdownBlock } from '../markdown/block';
+import type { MarkdownBlock, TableTranslationStrategy, TranslatedMarkdownBlock } from '../markdown/block';
 
 export type TranslateInput = {
 	text: string;
@@ -20,6 +20,7 @@ export type TranslationSchedulerInput = {
 	sourceLanguage: string;
 	targetLanguage: string;
 	blocks: MarkdownBlock[];
+	tableTranslationStrategy?: TableTranslationStrategy;
 };
 
 export type TranslationSchedulerResult = {

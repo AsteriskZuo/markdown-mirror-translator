@@ -5,6 +5,7 @@ export type MarkdownBlockKind =
 	| 'paragraph'
 	| 'listItem'
 	| 'blockquote'
+	| 'table'
 	| 'tableRow'
 	| 'fencedCode'
 	| 'html'
@@ -17,6 +18,21 @@ export type ProtectedInlineToken = {
 	value: string;
 };
 
+export type MarkdownTableAlignment = 'default' | 'left' | 'right' | 'center';
+
+export type MarkdownTable = {
+	header: string[];
+	alignments: MarkdownTableAlignment[];
+	rows: string[][];
+};
+
+export type TranslatedMarkdownTable = {
+	header: string[];
+	rows: string[][];
+};
+
+export type TableTranslationStrategy = 'adaptive' | 'row' | 'cell';
+
 export type MarkdownBlock = {
 	id: string;
 	kind: MarkdownBlockKind;
@@ -26,11 +42,13 @@ export type MarkdownBlock = {
 	translatable: boolean;
 	state: MarkdownBlockState;
 	protectedInlines: ProtectedInlineToken[];
+	table?: MarkdownTable;
 };
 
 export type TranslatedMarkdownBlock = MarkdownBlock & {
 	translatedText: string;
 	errorMessage?: string;
+	translatedTable?: TranslatedMarkdownTable;
 };
 
 export type RenderMode = 'translated' | 'bilingual';
