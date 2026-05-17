@@ -50,14 +50,27 @@ suite('Markdown parser', () => {
 		assert.strictEqual(blocks[4].translatable, false);
 	});
 
-	test('marks table rows as translatable blocks', () => {
+	test('parses pipe tables as structured table blocks', () => {
 		const blocks = parseMarkdownBlocks('| Name | Description |\n| --- | --- |\n| API | Local pipeline |\n');
+
+		assert.strictEqual(blocks.length, 1);
+		assert.strictEqual(blocks[0].kind, 'table');
+		assert.strictEqual(blocks[0].translatable, true);
+		assert.strictEqual(blocks[0].text, 'Name | Description\nAPI | Local pipeline');
+		assert.deepStrictEqual(blocks[0].table, {
+			header: ['Name', 'Description'],
+			alignments: ['default', 'default'],
+			rows: [['API', 'Local pipeline']],
+		});
+	});
+
+	test('keeps non-table pipe rows as table row blocks', () => {
+		const blocks = parseMarkdownBlocks('| Name | Description |\n| API | Local pipeline |\n');
 
 		assert.deepStrictEqual(
 			blocks.map((block) => ({ kind: block.kind, text: block.text, translatable: block.translatable })),
 			[
 				{ kind: 'tableRow', text: '| Name | Description |', translatable: true },
-				{ kind: 'tableRow', text: '| --- | --- |', translatable: true },
 				{ kind: 'tableRow', text: '| API | Local pipeline |', translatable: true },
 			],
 		);

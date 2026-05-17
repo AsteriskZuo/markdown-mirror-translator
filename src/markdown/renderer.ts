@@ -1,4 +1,4 @@
-import type { RenderMode, TranslatedMarkdownBlock } from './block';
+import type { MarkdownTableAlignment, RenderMode, TranslatedMarkdownBlock } from './block';
 
 function restoreInlineTokens(text: string, block: TranslatedMarkdownBlock): string {
 	return block.protectedInlines.reduce(
@@ -11,6 +11,40 @@ function ensureTrailingNewline(text: string): string {
 	return text.endsWith('\n') ? text : `${text}\n`;
 }
 
+function renderTableSeparator(alignments: MarkdownTableAlignment[]): string {
+	return alignments.map((alignment) => {
+		if (alignment === 'left') {
+			return ':---';
+		}
+
+		if (alignment === 'right') {
+			return '---:';
+		}
+
+		if (alignment === 'center') {
+			return ':---:';
+		}
+
+		return '---';
+	}).join(' | ');
+}
+
+function renderTableRow(cells: string[], block: TranslatedMarkdownBlock): string {
+	return `| ${cells.map((cell) => restoreInlineTokens(cell, block)).join(' | ')} |`;
+}
+
+function renderTranslatedTable(block: TranslatedMarkdownBlock): string {
+	if (!block.table || !block.translatedTable) {
+		return block.source;
+	}
+
+	return ensureTrailingNewline([
+		renderTableRow(block.translatedTable.header, block),
+		`| ${renderTableSeparator(block.table.alignments)} |`,
+		...block.translatedTable.rows.map((row) => renderTableRow(row, block)),
+	].join('\n'));
+}
+
 function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 	if (!block.translatable) {
 		return block.source;
@@ -18,6 +52,10 @@ function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 
 	if (block.state === 'failed') {
 		return block.source;
+	}
+
+	if (block.kind === 'table') {
+		return renderTranslatedTable(block);
 	}
 
 	const translatedText = restoreInlineTokens(block.translatedText, block);
