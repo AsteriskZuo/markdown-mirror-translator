@@ -177,10 +177,10 @@ export class TranslationScheduler {
 			return this.translateTableAdaptive(block, sourceLanguage, targetLanguage);
 		}
 
-		const header = await this.translateRow(block.table.header, sourceLanguage, targetLanguage);
+		const header = await this.translateRowWithCellFallback(block.table.header, sourceLanguage, targetLanguage);
 		const rows: string[][] = [];
 		for (const row of block.table.rows) {
-			rows.push(await this.translateRow(row, sourceLanguage, targetLanguage));
+			rows.push(await this.translateRowWithCellFallback(row, sourceLanguage, targetLanguage));
 		}
 
 		return {
@@ -241,11 +241,6 @@ export class TranslationScheduler {
 		return translatedCells;
 	}
 
-	private async translateRow(cells: string[], sourceLanguage: string, targetLanguage: string): Promise<string[]> {
-		const translatedRow = await this.translateTextInChunks(cells.join(' | '), sourceLanguage, targetLanguage);
-		return normalizeTranslatedRow(translatedRow.split('|').map((cell) => cell.trim()), cells);
-	}
-
 	private async translateRowWithCellFallback(cells: string[], sourceLanguage: string, targetLanguage: string): Promise<string[]> {
 		const rowText = cells.join(' | ');
 
@@ -304,24 +299,6 @@ function createSameLanguageTable(block: MarkdownBlock): TranslatedMarkdownTable 
 		header: [...block.table.header],
 		rows: block.table.rows.map((row) => [...row]),
 	};
-}
-
-function normalizeTranslatedRow(translatedCells: string[], sourceCells: string[]): string[] {
-	if (translatedCells.length === sourceCells.length) {
-		return translatedCells;
-	}
-
-	if (translatedCells.length > sourceCells.length) {
-		return [
-			...translatedCells.slice(0, sourceCells.length - 1),
-			translatedCells.slice(sourceCells.length - 1).join(' | '),
-		];
-	}
-
-	return [
-		...translatedCells,
-		...sourceCells.slice(translatedCells.length),
-	];
 }
 
 function parseCachedTable(cached: string): TranslatedMarkdownTable | undefined {

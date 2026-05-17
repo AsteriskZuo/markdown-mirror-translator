@@ -374,6 +374,56 @@ suite('Translation scheduler', () => {
 		assert.strictEqual(result.failedBlockCount, 0);
 	});
 
+	test('falls back to cell translation when row strategy output cannot map to source columns', async () => {
+		const provider = new MappingProvider({
+			'Name | Description': '名称 描述',
+			'API | Local pipeline': '接口 本地流水线',
+			Name: '名称',
+			Description: '描述',
+			API: '接口',
+			'Local pipeline': '本地流水线',
+		});
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		const result = await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			tableTranslationStrategy: 'row',
+			blocks: [
+				sourceBlock({
+					id: 'block-table',
+					kind: 'table',
+					source: '| Name | Description |\n| --- | --- |\n| API | Local pipeline |\n',
+					text: 'Name | Description\nAPI | Local pipeline',
+					hash: 'hash-table-row-mismatch',
+					table: {
+						header: ['Name', 'Description'],
+						alignments: ['default', 'default'],
+						rows: [['API', 'Local pipeline']],
+					},
+				}),
+			],
+		});
+
+		assert.deepStrictEqual(provider.inputs.map((input) => input.text), [
+			'Name | Description',
+			'Name',
+			'Description',
+			'API | Local pipeline',
+			'API',
+			'Local pipeline',
+		]);
+		assert.deepStrictEqual(result.blocks[0].translatedTable, {
+			header: ['名称', '描述'],
+			rows: [['接口', '本地流水线']],
+		});
+		assert.strictEqual(result.blocks[0].state, 'translated');
+		assert.strictEqual(result.failedBlockCount, 0);
+	});
+
 	test('translates structured tables by cell when requested', async () => {
 		const provider = new RecordingProvider(undefined, 500);
 		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
