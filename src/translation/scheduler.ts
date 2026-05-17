@@ -325,14 +325,152 @@ function normalizeLanguageCode(language: string): string {
 	return language.trim().toLowerCase();
 }
 
+type SplitBoundary = {
+	index: number;
+	priority: number;
+};
+
+const protectedInlineTokenPattern = /__MMT_INLINE_\d+__/g;
+
 function splitText(text: string, maxTextLength: number): string[] {
-	if (text.length <= maxTextLength) {
+	if (text.length <= maxTextLength || maxTextLength <= 0) {
 		return [text];
 	}
 
 	const chunks: string[] = [];
-	for (let start = 0; start < text.length; start += maxTextLength) {
-		chunks.push(text.slice(start, start + maxTextLength));
+	let start = 0;
+
+	while (start < text.length) {
+		if (text.length - start <= maxTextLength) {
+			chunks.push(text.slice(start));
+			break;
+		}
+
+		const preferredEnd = findPreferredChunkEnd(text, start, maxTextLength);
+		chunks.push(text.slice(start, preferredEnd));
+		start = preferredEnd;
 	}
+
 	return chunks;
+}
+
+function findPreferredChunkEnd(text: string, start: number, maxTextLength: number): number {
+	const hardEnd = Math.min(text.length, start + maxTextLength);
+	const protectedSafeEnd = moveEndBeforeProtectedToken(text, start, hardEnd);
+	const searchEnd = protectedSafeEnd > start ? protectedSafeEnd : hardEnd;
+	const boundary = findBestBoundary(text, start, searchEnd);
+
+	if (boundary !== undefined) {
+		return boundary.index;
+	}
+
+	if (protectedSafeEnd > start) {
+		return protectedSafeEnd;
+	}
+
+	const tokenEnd = findProtectedTokenEndCovering(text, hardEnd);
+	if (tokenEnd !== undefined) {
+		return tokenEnd;
+	}
+
+	return hardEnd;
+}
+
+function findBestBoundary(text: string, start: number, end: number): SplitBoundary | undefined {
+	let best: SplitBoundary | undefined;
+
+	for (let index = start; index < end; index += 1) {
+		const nextChar = text[index + 1];
+		const priority = getBoundaryPriority(text, index, nextChar);
+
+		if (priority === 0) {
+			continue;
+		}
+
+		const boundaryIndex = moveBoundaryAfterTrailingWhitespace(text, index + 1, end, priority);
+
+		if (boundaryIndex <= start) {
+			continue;
+		}
+
+		if (best === undefined || priority > best.priority || (priority === best.priority && boundaryIndex > best.index)) {
+			best = { index: boundaryIndex, priority };
+		}
+	}
+
+	return best;
+}
+
+function getBoundaryPriority(text: string, index: number, nextChar: string | undefined): number {
+	const char = text[index];
+
+	if (char === '\n') {
+		return 5;
+	}
+
+	if (char === '。' || char === '！' || char === '？' || char === '!' || char === '?') {
+		return 5;
+	}
+
+	if (char === '.' && (nextChar === undefined || index + 1 === text.length || /\s/u.test(nextChar))) {
+		return 5;
+	}
+
+	if (char === '；' || char === ';' || char === '：' || char === ':') {
+		return 4;
+	}
+
+	if (char === '，' || char === ',' || char === '、') {
+		return 3;
+	}
+
+	if (/\s/u.test(char)) {
+		return 1;
+	}
+
+	return 0;
+}
+
+function moveBoundaryAfterTrailingWhitespace(text: string, boundaryIndex: number, end: number, priority: number): number {
+	if (priority === 1) {
+		return boundaryIndex;
+	}
+
+	while (boundaryIndex < end && /\s/u.test(text[boundaryIndex])) {
+		boundaryIndex += 1;
+	}
+
+	return boundaryIndex;
+}
+
+function moveEndBeforeProtectedToken(text: string, start: number, end: number): number {
+	for (const match of text.matchAll(protectedInlineTokenPattern)) {
+		const tokenStart = match.index;
+		if (tokenStart === undefined) {
+			continue;
+		}
+
+		const tokenEnd = tokenStart + match[0].length;
+		if (tokenStart < end && tokenEnd > end) {
+			return tokenStart > start ? tokenStart : start;
+		}
+	}
+
+	return end;
+}
+
+function findProtectedTokenEndCovering(text: string, index: number): number | undefined {
+	for (const match of text.matchAll(protectedInlineTokenPattern)) {
+		const tokenStart = match.index;
+		if (tokenStart === undefined) {
+			continue;
+		}
+
+		const tokenEnd = tokenStart + match[0].length;
+		if (tokenStart < index && tokenEnd > index) {
+			return tokenEnd;
+		}
+	}
+
+	return undefined;
 }

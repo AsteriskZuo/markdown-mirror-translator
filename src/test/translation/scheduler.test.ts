@@ -151,6 +151,92 @@ suite('Translation scheduler', () => {
 		assert.strictEqual(result.blocks[0].translatedText, '[zh-CN] abcde[zh-CN] fghij');
 	});
 
+	test('splits long text on semantic boundaries before hard limits', async () => {
+		const provider = new RecordingProvider(undefined, 18);
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		const result = await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			blocks: [
+				sourceBlock({
+					id: 'block-1',
+					text: 'First sentence. Second clause; third part, final',
+					hash: 'hash-semantic-chunks',
+				}),
+			],
+		});
+
+		assert.deepStrictEqual(provider.inputs.map((input) => input.text), [
+			'First sentence. ',
+			'Second clause; ',
+			'third part, final',
+		]);
+		assert.strictEqual(
+			result.blocks[0].translatedText,
+			'[zh-CN] First sentence. [zh-CN] Second clause; [zh-CN] third part, final',
+		);
+		assert.strictEqual(result.blocks[0].state, 'translated');
+		assert.strictEqual(result.failedBlockCount, 0);
+	});
+
+	test('does not treat dots inside versions domains or decimals as sentence boundaries', async () => {
+		const provider = new RecordingProvider(undefined, 17);
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			blocks: [
+				sourceBlock({
+					id: 'block-1',
+					text: 'Use v1.2.3, api.example.com, and 3.14. Done.',
+					hash: 'hash-dot-chunks',
+				}),
+			],
+		});
+
+		assert.deepStrictEqual(provider.inputs.map((input) => input.text), [
+			'Use v1.2.3, ',
+			'api.example.com, ',
+			'and 3.14. Done.',
+		]);
+	});
+
+	test('does not split protected inline tokens', async () => {
+		const provider = new RecordingProvider(undefined, 20);
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			blocks: [
+				sourceBlock({
+					id: 'block-1',
+					text: 'Read __MMT_INLINE_0__ before continuing with the paragraph.',
+					hash: 'hash-inline-token-chunks',
+					protectedInlines: [{ token: '__MMT_INLINE_0__', value: '`code`' }],
+				}),
+			],
+		});
+
+		assert.deepStrictEqual(provider.inputs.map((input) => input.text), [
+			'Read ',
+			'__MMT_INLINE_0__ ',
+			'before continuing ',
+			'with the paragraph.',
+		]);
+	});
+
 	test('keeps failed blocks as source through failed state', async () => {
 		const provider = new RecordingProvider('World');
 		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
@@ -164,6 +250,35 @@ suite('Translation scheduler', () => {
 			blocks: [sourceBlock({ id: 'block-1', text: 'World', hash: 'hash-fail' })],
 		});
 
+		assert.strictEqual(result.failedBlockCount, 1);
+		assert.strictEqual(result.blocks[0].state, 'failed');
+		assert.strictEqual(result.blocks[0].translatedText, '');
+		assert.match(result.blocks[0].errorMessage ?? '', /provider failed/);
+	});
+
+	test('keeps block-level failure behavior when a semantic chunk fails', async () => {
+		const provider = new RecordingProvider('Second sentence.', 18);
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		const result = await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			blocks: [
+				sourceBlock({
+					id: 'block-1',
+					text: 'First sentence. Second sentence.',
+					hash: 'hash-semantic-chunk-failure',
+				}),
+			],
+		});
+
+		assert.deepStrictEqual(provider.inputs.map((input) => input.text), [
+			'First sentence. ',
+			'Second sentence.',
+		]);
 		assert.strictEqual(result.failedBlockCount, 1);
 		assert.strictEqual(result.blocks[0].state, 'failed');
 		assert.strictEqual(result.blocks[0].translatedText, '');
