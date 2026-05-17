@@ -4,6 +4,12 @@ All notable changes to the "markdown-mirror-translator" extension will be docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.0.3] - 2026-05-17
+
+- Split long ordinary text on language-neutral semantic boundaries instead of only hard length slices.
+- Avoid splitting protected inline placeholder tokens during text chunking.
+- Keep block-level failure behavior unchanged when a chunk translation fails.
+
 ## [1.0.2] - 2026-05-17
 
 - Fix bilingual Markdown rendering so consecutive list items do not gain paragraph-sized blank lines between source and translated list rows.

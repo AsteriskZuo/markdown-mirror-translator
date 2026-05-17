@@ -2,7 +2,7 @@
   "name": "markdown-mirror-translator",
   "displayName": "Markdown Mirror Translator",
   "description": "Markdown Mirror Translator",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "engines": {
     "vscode": "^1.118.0"
