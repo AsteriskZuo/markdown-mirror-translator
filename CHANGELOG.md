@@ -4,6 +4,13 @@ All notable changes to the "markdown-mirror-translator" extension will be docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.1.0] - 2026-05-17
+
+- Add optional synchronized scrolling between the source Markdown editor and translated virtual Markdown editor.
+- Use block-based line mappings so translated-only and bilingual documents stay aligned without relying on global line-count formulas.
+- Remove extra blank lines inserted by bilingual rendering; original blank Markdown lines are preserved.
+- Add a documented VS Code `revealRange(..., AtTop)` compensation for editor scroll positioning.
+
 ## [1.0.3] - 2026-05-17
 
 - Split long ordinary text on language-neutral semantic boundaries instead of only hard length slices.

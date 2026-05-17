@@ -1,4 +1,4 @@
-import type { MarkdownTableAlignment, RenderMode, TranslatedMarkdownBlock } from './block';
+import type { MarkdownTableAlignment, RenderMode, TranslatedMarkdownBlock, TranslationLineMapping } from './block';
 
 const listItemPrefixPattern = /^(\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)/;
 
@@ -33,6 +33,65 @@ function renderTableSeparator(alignments: MarkdownTableAlignment[]): string {
 
 function renderTableRow(cells: string[], block: TranslatedMarkdownBlock): string {
 	return `| ${cells.map((cell) => restoreInlineTokens(cell, block)).join(' | ')} |`;
+}
+
+export type RenderedMarkdownWithLineMappings = {
+	markdown: string;
+	lineMappings: TranslationLineMapping[];
+};
+
+export function getRenderedMarkdownLineCount(text: string): number {
+	if (text.length === 0) {
+		return 0;
+	}
+
+	const withoutTrailingNewline = text.endsWith('\n') ? text.slice(0, -1) : text;
+	if (withoutTrailingNewline.length === 0) {
+		return 1;
+	}
+
+	return withoutTrailingNewline.split('\n').length;
+}
+
+function getBlockSourceLineCount(block: TranslatedMarkdownBlock): number {
+	return Math.max(1, getRenderedMarkdownLineCount(block.source));
+}
+
+function createLineMapping(
+	block: TranslatedMarkdownBlock,
+	sourceStartLine: number,
+	translatedStartLine: number,
+	renderedBlock: string,
+): TranslationLineMapping {
+	const sourceLineCount = getBlockSourceLineCount(block);
+	const translatedLineCount = Math.max(1, getRenderedMarkdownLineCount(renderedBlock));
+
+	return {
+		blockId: block.id,
+		sourceStartLine,
+		sourceEndLine: sourceStartLine + sourceLineCount - 1,
+		translatedStartLine,
+		translatedEndLine: translatedStartLine + translatedLineCount - 1,
+	};
+}
+
+export function createSourceLineMappings(blocks: TranslatedMarkdownBlock[]): TranslationLineMapping[] {
+	const lineMappings: TranslationLineMapping[] = [];
+	let sourceLine = 0;
+
+	for (const block of blocks) {
+		const lineCount = getBlockSourceLineCount(block);
+		lineMappings.push({
+			blockId: block.id,
+			sourceStartLine: sourceLine,
+			sourceEndLine: sourceLine + lineCount - 1,
+			translatedStartLine: sourceLine,
+			translatedEndLine: sourceLine + lineCount - 1,
+		});
+		sourceLine += lineCount;
+	}
+
+	return lineMappings;
 }
 
 function renderTranslatedTable(block: TranslatedMarkdownBlock): string {
@@ -82,48 +141,32 @@ function renderTranslatedBlock(block: TranslatedMarkdownBlock): string {
 
 function renderBilingualBlock(block: TranslatedMarkdownBlock): string {
 	if (!block.translatable) {
-		if (block.kind === 'blank') {
-			return '';
-		}
-
 		return block.source;
 	}
 
-	if (block.kind === 'listItem') {
-		return `${ensureTrailingNewline(block.source).trimEnd()}\n${renderTranslatedBlock(block).trimEnd()}\n`;
+	return `${ensureTrailingNewline(block.source)}${renderTranslatedBlock(block)}`;
+}
+
+export function renderMarkdownWithLineMappings(
+	blocks: TranslatedMarkdownBlock[],
+	mode: RenderMode,
+): RenderedMarkdownWithLineMappings {
+	let markdown = '';
+	const lineMappings: TranslationLineMapping[] = [];
+	let sourceLine = 0;
+	let translatedLine = 0;
+
+	for (const block of blocks) {
+		const renderedBlock = mode === 'translated' ? renderTranslatedBlock(block) : renderBilingualBlock(block);
+		lineMappings.push(createLineMapping(block, sourceLine, translatedLine, renderedBlock));
+		markdown += renderedBlock;
+		sourceLine += getBlockSourceLineCount(block);
+		translatedLine += Math.max(1, getRenderedMarkdownLineCount(renderedBlock));
 	}
 
-	return `${ensureTrailingNewline(block.source).trimEnd()}\n\n${renderTranslatedBlock(block).trimEnd()}\n`;
+	return { markdown, lineMappings };
 }
 
 export function renderMarkdown(blocks: TranslatedMarkdownBlock[], mode: RenderMode): string {
-	if (mode === 'translated') {
-		return blocks.map(renderTranslatedBlock).join('');
-	}
-
-	let rendered = '';
-	let previousRenderedKind: TranslatedMarkdownBlock['kind'] | undefined;
-	let pendingBlankSeparator = false;
-
-	for (const block of blocks) {
-		const renderedBlock = renderBilingualBlock(block);
-
-		if (renderedBlock.length === 0) {
-			if (block.kind === 'blank' && rendered.length > 0) {
-				pendingBlankSeparator = true;
-			}
-			continue;
-		}
-
-		const joinsConsecutiveListItems = previousRenderedKind === 'listItem' && block.kind === 'listItem';
-		if (rendered.length > 0 && (pendingBlankSeparator || !joinsConsecutiveListItems)) {
-			rendered += '\n';
-		}
-
-		rendered += renderedBlock;
-		previousRenderedKind = block.kind;
-		pendingBlankSeparator = false;
-	}
-
-	return rendered;
+	return renderMarkdownWithLineMappings(blocks, mode).markdown;
 }

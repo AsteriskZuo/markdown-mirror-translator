@@ -52,3 +52,11 @@ export type TranslatedMarkdownBlock = MarkdownBlock & {
 };
 
 export type RenderMode = 'translated' | 'bilingual';
+
+export type TranslationLineMapping = {
+	blockId: string;
+	sourceStartLine: number;
+	sourceEndLine: number;
+	translatedStartLine: number;
+	translatedEndLine: number;
+};

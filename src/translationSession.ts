@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { MarkdownMirrorTranslatorConfig } from './config';
-import type { MarkdownBlock, RenderMode, TranslatedMarkdownBlock } from './markdown/block';
+import type { MarkdownBlock, RenderMode, TranslatedMarkdownBlock, TranslationLineMapping } from './markdown/block';
 
 export type TranslationSession = {
 	sourceUri: vscode.Uri;
@@ -9,6 +9,7 @@ export type TranslationSession = {
 	sourceBlocks: MarkdownBlock[];
 	translatedBlocks: TranslatedMarkdownBlock[];
 	renderedContent: string;
+	lineMappings: TranslationLineMapping[];
 	renderMode: RenderMode;
 	config: MarkdownMirrorTranslatorConfig;
 	updatedAt: number;
@@ -21,6 +22,7 @@ export type CreateInitialSessionInput = {
 	sourceBlocks?: MarkdownBlock[];
 	translatedBlocks?: TranslatedMarkdownBlock[];
 	renderedContent?: string;
+	lineMappings?: TranslationLineMapping[];
 	renderMode?: RenderMode;
 	config: MarkdownMirrorTranslatorConfig;
 };
@@ -33,6 +35,7 @@ export function createInitialSession(input: CreateInitialSessionInput): Translat
 		sourceBlocks: input.sourceBlocks ?? [],
 		translatedBlocks: input.translatedBlocks ?? [],
 		renderedContent: input.renderedContent ?? input.sourceContent,
+		lineMappings: input.lineMappings ?? [],
 		renderMode: input.renderMode ?? (input.config.bilingual ? 'bilingual' : 'translated'),
 		config: input.config,
 		updatedAt: Date.now(),
@@ -51,11 +54,13 @@ export function replaceTranslatedBlocks(
 	session: TranslationSession,
 	translatedBlocks: TranslatedMarkdownBlock[],
 	renderedContent: string,
+	lineMappings: TranslationLineMapping[] = session.lineMappings,
 ): TranslationSession {
 	return {
 		...session,
 		translatedBlocks,
 		renderedContent,
+		lineMappings,
 		updatedAt: Date.now(),
 	};
 }

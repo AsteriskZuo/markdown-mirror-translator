@@ -10,6 +10,7 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 
 - 通过命令面板或编辑器标题栏按钮翻译当前 Markdown 文件。
 - 左侧保留原始 Markdown 文件，右侧打开只读译文 Markdown 文档。
+- 支持原文编辑器和只读译文编辑器之间的滚动同步。
 - 支持纯译文 Markdown 和双语 Markdown 两种输出模式。
 - 尽量保护 fenced code block、inline code、URL、frontmatter、HTML block、pipe table 等 Markdown 结构。
 - 可翻译标题、段落、列表项、引用块、表格行、链接文字和图片 alt 文本等内容。
@@ -23,7 +24,6 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 - 不做 Markdown HTML 预览渲染。
 - 不提供 webview 预览。
 - 不提供 AI 翻译。
-- 不做原文与译文编辑器滚动同步。
 - 不做选区翻译。
 - 不做文件夹或项目批量翻译。
 - 不提供术语库。
@@ -55,6 +55,7 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 | `markdownMirrorTranslator.targetLanguage` | `"zh-CN"` | 目标语言代码。 |
 | `markdownMirrorTranslator.bilingual` | `false` | `false` 显示纯译文 Markdown；`true` 显示原文和译文相邻排列的双语 Markdown。 |
 | `markdownMirrorTranslator.translationUpdateMode` | `"manual"` | 翻译更新模式。目前实现 `manual`；`auto` 为预留值，当前仍按手动模式处理。 |
+| `markdownMirrorTranslator.syncScroll` | `true` | 同步原文编辑器和只读译文编辑器的滚动位置。 |
 
 示例：
 
@@ -63,7 +64,8 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
   "markdownMirrorTranslator.sourceLanguage": "",
   "markdownMirrorTranslator.targetLanguage": "zh-CN",
   "markdownMirrorTranslator.bilingual": false,
-  "markdownMirrorTranslator.translationUpdateMode": "manual"
+  "markdownMirrorTranslator.translationUpdateMode": "manual",
+  "markdownMirrorTranslator.syncScroll": true
 }
 ```
 
@@ -73,7 +75,8 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 2. 执行 `Markdown Mirror Translator: Translate Current File`。
 3. 原始 Markdown 文件保留在左侧，右侧打开只读译文 Markdown 文档。
 4. 查看右侧译文源文本。
-5. 需要编辑或使用其他 Markdown 预览工具查看译文时，执行 `Markdown Mirror Translator: Save Translated File` 保存为真实文件。
+5. 滚动任一侧编辑器时，另一侧会跟随到对应的原文或译文区域。
+6. 需要编辑或使用其他 Markdown 预览工具查看译文时，执行 `Markdown Mirror Translator: Save Translated File` 保存为真实文件。
 
 如果翻译后继续修改源 Markdown 文件，需要手动再次执行 `Translate Current File`。插件不会在你输入时自动重新翻译。
 
@@ -111,15 +114,13 @@ This is a document.
 
 ```markdown
 # Hello
-
 # 你好
 
 This is a document.
-
 这是一个文档。
 ```
 
-双语模式采用块级相邻输出，不追求复杂排版，也不生成渲染预览布局。
+双语模式采用块级相邻输出，并保留原文中已有的空行；它不追求复杂排版，也不生成渲染预览布局。
 
 ## 保存译文文件
 

@@ -10,6 +10,7 @@ It is not a Markdown preview renderer. It does not replace VS Code's built-in Ma
 
 - Translate the current Markdown file from the command palette or editor title button.
 - Keep the original Markdown file on the left and open a read-only translated Markdown document on the right.
+- Synchronize scrolling between the source editor and translated virtual editor.
 - Show either translated-only Markdown or adjacent bilingual Markdown.
 - Preserve common Markdown structures such as fenced code blocks, inline code, URLs, frontmatter, HTML blocks, and pipe tables.
 - Translate headings, paragraphs, list items, block quotes, table rows, link labels, and image alt text where possible.
@@ -23,7 +24,6 @@ It is not a Markdown preview renderer. It does not replace VS Code's built-in Ma
 - It does not render Markdown preview HTML.
 - It does not provide a webview preview.
 - It does not provide AI translation.
-- It does not synchronize scrolling between source and translated editors.
 - It does not translate selections only.
 - It does not translate folders or projects in batch.
 - It does not provide a glossary.
@@ -55,6 +55,7 @@ This extension contributes the following settings:
 | `markdownMirrorTranslator.targetLanguage` | `"zh-CN"` | Target language code for translated Markdown. |
 | `markdownMirrorTranslator.bilingual` | `false` | When `false`, show translated-only Markdown. When `true`, show source and translated blocks together. |
 | `markdownMirrorTranslator.translationUpdateMode` | `"manual"` | Translation update mode. `manual` is implemented. `auto` is reserved and currently behaves as manual. |
+| `markdownMirrorTranslator.syncScroll` | `true` | Synchronize scrolling between the source editor and translated virtual editor. |
 
 Example:
 
@@ -63,7 +64,8 @@ Example:
   "markdownMirrorTranslator.sourceLanguage": "",
   "markdownMirrorTranslator.targetLanguage": "zh-CN",
   "markdownMirrorTranslator.bilingual": false,
-  "markdownMirrorTranslator.translationUpdateMode": "manual"
+  "markdownMirrorTranslator.translationUpdateMode": "manual",
+  "markdownMirrorTranslator.syncScroll": true
 }
 ```
 
@@ -73,7 +75,8 @@ Example:
 2. Run `Markdown Mirror Translator: Translate Current File`.
 3. The original Markdown file remains open, and a read-only translated Markdown document opens beside it.
 4. Review the translated Markdown source.
-5. Run `Markdown Mirror Translator: Save Translated File` from the translated document when you want a real editable file.
+5. Scroll either editor to follow the corresponding source or translated area in the paired editor.
+6. Run `Markdown Mirror Translator: Save Translated File` from the translated document when you want a real editable file.
 
 If you edit the source Markdown after translating, run `Translate Current File` again manually. The extension intentionally does not retranslate automatically while you type.
 
@@ -111,15 +114,13 @@ Bilingual result:
 
 ```markdown
 # Hello
-
 # 你好
 
 This is a document.
-
 这是一个文档。
 ```
 
-Bilingual output is block-adjacent by design. It does not attempt complex layout or rendered preview formatting.
+Bilingual output is block-adjacent by design and preserves original blank Markdown lines. It does not attempt complex layout or rendered preview formatting.
 
 ## Saving Translated Files
 

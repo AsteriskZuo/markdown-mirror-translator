@@ -2,7 +2,7 @@
   "name": "markdown-mirror-translator",
   "displayName": "Markdown Mirror Translator",
   "description": "Markdown Mirror Translator",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.118.0"
@@ -58,6 +58,11 @@
           ],
           "default": "manual",
           "description": "Translation update mode. Phase 1 treats auto as manual."
+        },
+        "markdownMirrorTranslator.syncScroll": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable synchronized scrolling between the source Markdown editor and translated Markdown editor."
         }
       }
     },

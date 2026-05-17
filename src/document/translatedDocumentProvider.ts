@@ -8,6 +8,7 @@ export class TranslatedDocumentProvider implements vscode.TextDocumentContentPro
 	private readonly changeEmitter = new vscode.EventEmitter<vscode.Uri>();
 	private readonly sourceToTranslatedUri = new Map<string, vscode.Uri>();
 	private readonly sessionsByTranslatedUri = new Map<string, TranslationSession>();
+	private readonly sessionsBySourceUri = new Map<string, TranslationSession>();
 
 	readonly onDidChange = this.changeEmitter.event;
 
@@ -33,7 +34,9 @@ export class TranslatedDocumentProvider implements vscode.TextDocumentContentPro
 
 	setSession(session: TranslationSession): void {
 		const translatedKey = session.translatedUri.toString();
+		const sourceKey = session.sourceUri.toString();
 		this.sessionsByTranslatedUri.set(translatedKey, session);
+		this.sessionsBySourceUri.set(sourceKey, session);
 	}
 
 	refreshSession(translatedUri: vscode.Uri): void {
@@ -42,6 +45,20 @@ export class TranslatedDocumentProvider implements vscode.TextDocumentContentPro
 
 	getSessionByTranslatedUri(translatedUri: vscode.Uri): TranslationSession | undefined {
 		return this.sessionsByTranslatedUri.get(translatedUri.toString());
+	}
+
+	getSessionBySourceUri(sourceUri: vscode.Uri): TranslationSession | undefined {
+		return this.sessionsBySourceUri.get(sourceUri.toString());
+	}
+
+	getSessionForUri(uri: vscode.Uri): TranslationSession | undefined {
+		return uri.scheme === translatedDocumentScheme
+			? this.getSessionByTranslatedUri(uri)
+			: this.getSessionBySourceUri(uri);
+	}
+
+	getSessions(): TranslationSession[] {
+		return Array.from(this.sessionsByTranslatedUri.values());
 	}
 
 	provideTextDocumentContent(uri: vscode.Uri): string {

@@ -56,6 +56,7 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.strictEqual(config.targetLanguage, 'zh-CN');
 		assert.strictEqual(config.bilingual, false);
 		assert.strictEqual(config.translationUpdateMode, 'manual');
+		assert.strictEqual(config.syncScroll, true);
 	});
 
 	test('extension commands are registered after activation', async () => {
@@ -68,6 +69,14 @@ suite('Markdown Mirror Translator shell', () => {
 		const commands = await vscode.commands.getCommands(true);
 		assert.ok(commands.includes('markdown-mirror-translator.translateCurrentFile'));
 		assert.ok(commands.includes('markdown-mirror-translator.saveTranslatedFile'));
+	});
+
+	test('extension activation registers translated document provider and scroll synchronizer', async () => {
+		const extension = vscode.extensions.getExtension('undefined_publisher.markdown-mirror-translator');
+
+		assert.ok(extension);
+		await extension.activate();
+		assert.strictEqual(extension.isActive, true);
 	});
 
 	test('editor title commands use icons with tooltip titles', async () => {
@@ -86,6 +95,24 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.strictEqual(saveCommand.icon, '$(save)');
 		assert.strictEqual(saveCommand.shortTitle, '');
 		assert.strictEqual(saveCommand.title, 'Markdown Mirror Translator: Save Translated File');
+	});
+
+	test('manifest contributes sync scroll setting enabled by default', async () => {
+		const manifestPath = path.resolve(__dirname, '../../package.json');
+		const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+			contributes: {
+				configuration: {
+					properties: Record<string, { type: string; default: unknown; description: string }>;
+				};
+			};
+		};
+
+		const setting = manifest.contributes.configuration.properties['markdownMirrorTranslator.syncScroll'];
+
+		assert.ok(setting);
+		assert.strictEqual(setting.type, 'boolean');
+		assert.strictEqual(setting.default, true);
+		assert.match(setting.description, /synchronized scrolling/i);
 	});
 
 	test('createInitialSession stores block state and rendered content', () => {
@@ -112,6 +139,15 @@ suite('Markdown Mirror Translator shell', () => {
 				translatedText: '[zh-CN] Hello',
 			},
 		];
+		const lineMappings = [
+			{
+				blockId: 'block-0',
+				sourceStartLine: 0,
+				sourceEndLine: 0,
+				translatedStartLine: 0,
+				translatedEndLine: 0,
+			},
+		];
 
 		const session = createInitialSession({
 			sourceUri,
@@ -120,6 +156,7 @@ suite('Markdown Mirror Translator shell', () => {
 			sourceBlocks,
 			translatedBlocks,
 			renderedContent: '# [zh-CN] Hello\n',
+			lineMappings,
 			renderMode: 'translated',
 			config: getConfig(),
 		});
@@ -130,6 +167,7 @@ suite('Markdown Mirror Translator shell', () => {
 		assert.deepStrictEqual(session.sourceBlocks, sourceBlocks);
 		assert.deepStrictEqual(session.translatedBlocks, translatedBlocks);
 		assert.strictEqual(session.renderedContent, '# [zh-CN] Hello\n');
+		assert.deepStrictEqual(session.lineMappings, lineMappings);
 		assert.strictEqual(session.renderMode, 'translated');
 		assert.ok(session.updatedAt > 0);
 	});
@@ -162,11 +200,21 @@ suite('Markdown Mirror Translator shell', () => {
 			config: getConfig(),
 		});
 		const translated = [{ ...sourceBlocks[0], translatedText: '你好', state: 'translated' as const }];
+		const lineMappings = [
+			{
+				blockId: 'block-0',
+				sourceStartLine: 0,
+				sourceEndLine: 0,
+				translatedStartLine: 0,
+				translatedEndLine: 0,
+			},
+		];
 
-		const updated = replaceTranslatedBlocks(initial, translated, '你好\n');
+		const updated = replaceTranslatedBlocks(initial, translated, '你好\n', lineMappings);
 
 		assert.deepStrictEqual(updated.translatedBlocks, translated);
 		assert.strictEqual(updated.renderedContent, '你好\n');
+		assert.deepStrictEqual(updated.lineMappings, lineMappings);
 		assert.ok(updated.updatedAt >= initial.updatedAt);
 	});
 
@@ -212,6 +260,29 @@ suite('Markdown Mirror Translator shell', () => {
 		provider.setSession(session);
 
 		assert.strictEqual(provider.provideTextDocumentContent(translatedUri), '# [zh-CN] Hello\n');
+	});
+
+	test('TranslatedDocumentProvider finds sessions by source or translated URI', () => {
+		const provider = new TranslatedDocumentProvider();
+		const sourceUri = vscode.Uri.file('/workspace/README.md');
+		const translatedUri = provider.getTranslatedUri(sourceUri, 'zh-CN', false);
+		const session = createInitialSession({
+			sourceUri,
+			translatedUri,
+			sourceContent: 'Hello\n',
+			sourceBlocks: [],
+			translatedBlocks: [],
+			renderedContent: '你好\n',
+			renderMode: 'translated',
+			config: getConfig(),
+		});
+
+		provider.setSession(session);
+
+		assert.strictEqual(provider.getSessionBySourceUri(sourceUri)?.translatedUri.toString(), translatedUri.toString());
+		assert.strictEqual(provider.getSessionForUri(sourceUri)?.sourceUri.toString(), sourceUri.toString());
+		assert.strictEqual(provider.getSessionForUri(translatedUri)?.translatedUri.toString(), translatedUri.toString());
+		assert.deepStrictEqual(provider.getSessions(), [session]);
 	});
 
 	test('translate command rejects translated virtual documents as sources', () => {
@@ -279,7 +350,7 @@ suite('Markdown Mirror Translator shell', () => {
 			assert.strictEqual(translatedUri.scheme, translatedDocumentScheme);
 			assert.strictEqual(
 				provider.provideTextDocumentContent(translatedUri),
-				'# Hello\n\n# [zh-CN] Hello\n\nWorld\n\n[zh-CN] World\n',
+				'# Hello\n# [zh-CN] Hello\n\nWorld\n[zh-CN] World\n',
 			);
 		} finally {
 			await config.update('bilingual', undefined, vscode.ConfigurationTarget.Global);

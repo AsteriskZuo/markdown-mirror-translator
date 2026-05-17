@@ -7,6 +7,7 @@ export type MarkdownMirrorTranslatorConfig = {
 	targetLanguage: string;
 	bilingual: boolean;
 	translationUpdateMode: TranslationUpdateMode;
+	syncScroll: boolean;
 };
 
 const configurationSection = 'markdownMirrorTranslator';
@@ -27,5 +28,6 @@ export function getConfig(): MarkdownMirrorTranslatorConfig {
 		targetLanguage: config.get<string>('targetLanguage', 'zh-CN'),
 		bilingual: config.get<boolean>('bilingual', false),
 		translationUpdateMode: normalizeUpdateMode(config.get<string>('translationUpdateMode', 'manual')),
+		syncScroll: config.get<boolean>('syncScroll', true),
 	};
 }

@@ -4,7 +4,7 @@ import { TranslationCache } from '../cache/translationCache';
 import { getConfig } from '../config';
 import { translatedDocumentScheme, TranslatedDocumentProvider } from '../document/translatedDocumentProvider';
 import { parseMarkdownBlocks } from '../markdown/parser';
-import { renderMarkdown } from '../markdown/renderer';
+import { createSourceLineMappings, renderMarkdownWithLineMappings } from '../markdown/renderer';
 import { createThrottledRefresh } from '../refresh/throttledRefresh';
 import { GoogleFreeTranslator } from '../translation/providers/googleFreeTranslator';
 import { TranslationScheduler } from '../translation/scheduler';
@@ -63,16 +63,18 @@ export async function translateCurrentFile(
 	const renderMode = config.bilingual ? 'bilingual' : 'translated';
 	const translatedUri = provider.getTranslatedUri(document.uri, config.targetLanguage, config.bilingual);
 	const sourceBlocks = parseMarkdownBlocks(sourceContent);
+	const initialTranslatedBlocks = sourceBlocks.map((block) => ({
+		...block,
+		translatedText: '',
+	}));
 	let session = createInitialSession({
 		sourceUri: document.uri,
 		translatedUri,
 		sourceContent,
 		sourceBlocks,
-		translatedBlocks: sourceBlocks.map((block) => ({
-			...block,
-			translatedText: '',
-		})),
+		translatedBlocks: initialTranslatedBlocks,
 		renderedContent: sourceContent,
+		lineMappings: createSourceLineMappings(initialTranslatedBlocks),
 		renderMode,
 		config,
 	});
@@ -90,8 +92,8 @@ export async function translateCurrentFile(
 	const scheduler = new TranslationScheduler(translator, cache, {
 		concurrency: translationConcurrency,
 		onProgress: (progress) => {
-			const renderedContent = renderMarkdown(progress.blocks, renderMode);
-			session = replaceTranslatedBlocks(session, progress.blocks, renderedContent);
+			const rendered = renderMarkdownWithLineMappings(progress.blocks, renderMode);
+			session = replaceTranslatedBlocks(session, progress.blocks, rendered.markdown, rendered.lineMappings);
 			provider.setSession(session);
 			refresh.request();
 		},
@@ -103,8 +105,8 @@ export async function translateCurrentFile(
 			targetLanguage: config.targetLanguage,
 			blocks: sourceBlocks,
 		});
-		const renderedContent = renderMarkdown(result.blocks, renderMode);
-		session = replaceTranslatedBlocks(session, result.blocks, renderedContent);
+		const rendered = renderMarkdownWithLineMappings(result.blocks, renderMode);
+		session = replaceTranslatedBlocks(session, result.blocks, rendered.markdown, rendered.lineMappings);
 		provider.setSession(session);
 		refresh.request();
 		refresh.flush();
