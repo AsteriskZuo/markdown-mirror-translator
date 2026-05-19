@@ -4,6 +4,7 @@
   "description": "Markdown Mirror Translator",
   "version": "1.1.1",
   "license": "MIT",
+  "publisher": "asteriskzuo",
   "repository": {
     "type": "git",
     "url": "https://github.com/AsteriskZuo/markdown-mirror-translator.git"
