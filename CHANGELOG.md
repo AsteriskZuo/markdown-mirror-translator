@@ -4,6 +4,10 @@ All notable changes to the "markdown-mirror-translator" extension will be docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.1.1] - 2026-05-19
+
+- Correctly skip fenced code blocks, indented code blocks, HTML blocks, and frontmatter during translation so they stay verbatim.
+
 ## [1.1.0] - 2026-05-17
 
 - Add optional synchronized scrolling between the source Markdown editor and translated virtual Markdown editor.
