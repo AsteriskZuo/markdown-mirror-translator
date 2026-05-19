@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import type { MarkdownBlock, MarkdownBlockKind, MarkdownTable, MarkdownTableAlignment, ProtectedInlineToken } from './block';
 
-export const PARSER_VERSION = 'markdown-mirror-translator-parser-v2';
+export const PARSER_VERSION = 'markdown-mirror-translator-parser-v3';
 
 const inlinePatterns = [
 	/`[^`\n]+`/g,
@@ -11,6 +11,9 @@ const inlinePatterns = [
 const markdownDestinationPattern = /(!?\[[^\]]*])\(([^)\s]+)(\s+"[^"]*")?\)/g;
 const urlPattern = /https?:\/\/[^\s)]+/g;
 const listItemPrefixPattern = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/;
+const fencedCodePattern = /^([ \t]{0,3})(`{3,}|~{3,})(.*)$/;
+const indentedCodePattern = /^(?: {4,}|\t)/;
+const htmlBlockPattern = /^([ \t]{0,3})<([A-Za-z][\w:-]*)(?:\s[^>]*)?>\s*$/;
 
 function hashBlock(kind: MarkdownBlockKind, text: string, source: string, protectedInlines: ProtectedInlineToken[]): string {
 	const canonical = JSON.stringify({
@@ -127,6 +130,10 @@ function classifyLine(line: string): MarkdownBlockKind {
 	return 'paragraph';
 }
 
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function isFrontmatterStart(lines: string[]): boolean {
 	return lines.length > 0 && /^---\s*$/.test(lines[0]);
 }
@@ -148,11 +155,79 @@ function consumeFrontmatter(lines: string[]): { source: string; nextIndex: numbe
 	return undefined;
 }
 
-function consumeFencedCode(lines: string[], startIndex: number): { source: string; nextIndex: number } {
-	const fence = lines[startIndex].match(/^(```|~~~)/)?.[1] ?? '```';
+function consumeFencedCode(lines: string[], startIndex: number): { source: string; nextIndex: number } | undefined {
+	const openingLine = lines[startIndex].replace(/\r?\n$/, '');
+	const match = openingLine.match(fencedCodePattern);
+
+	if (!match) {
+		return undefined;
+	}
+
+	const fence = match[2];
+	const closingPattern = new RegExp(`^[ \\t]{0,3}${escapeRegExp(fence)}[ \\t]*$`);
 
 	for (let index = startIndex + 1; index < lines.length; index += 1) {
-		if (lines[index].startsWith(fence)) {
+		if (closingPattern.test(lines[index].replace(/\r?\n$/, ''))) {
+			return {
+				source: lines.slice(startIndex, index + 1).join(''),
+				nextIndex: index + 1,
+			};
+		}
+	}
+
+	return {
+		source: lines.slice(startIndex).join(''),
+		nextIndex: lines.length,
+	};
+}
+
+function consumeIndentedCode(lines: string[], startIndex: number): { source: string; nextIndex: number } | undefined {
+	if (!indentedCodePattern.test(lines[startIndex].replace(/\r?\n$/, ''))) {
+		return undefined;
+	}
+
+	let nextIndex = startIndex + 1;
+	while (nextIndex < lines.length) {
+		const line = lines[nextIndex].replace(/\r?\n$/, '');
+		if (line.length === 0) {
+			let lookahead = nextIndex + 1;
+			while (lookahead < lines.length && lines[lookahead].replace(/\r?\n$/, '').length === 0) {
+				lookahead += 1;
+			}
+
+			if (lookahead >= lines.length || !indentedCodePattern.test(lines[lookahead].replace(/\r?\n$/, ''))) {
+				break;
+			}
+
+			nextIndex = lookahead;
+			continue;
+		}
+
+		if (!indentedCodePattern.test(line)) {
+			break;
+		}
+		nextIndex += 1;
+	}
+
+	return {
+		source: lines.slice(startIndex, nextIndex).join(''),
+		nextIndex,
+	};
+}
+
+function consumeHtmlBlock(lines: string[], startIndex: number): { source: string; nextIndex: number } | undefined {
+	const openingLine = lines[startIndex].replace(/\r?\n$/, '');
+	const match = openingLine.match(htmlBlockPattern);
+
+	if (!match || /\/>\s*$/.test(openingLine)) {
+		return undefined;
+	}
+
+	const tagName = match[2];
+	const closingPattern = new RegExp(`^[ \\t]{0,3}</${escapeRegExp(tagName)}\\s*>\\s*$`, 'i');
+
+	for (let index = startIndex + 1; index < lines.length; index += 1) {
+		if (closingPattern.test(lines[index].replace(/\r?\n$/, ''))) {
 			return {
 				source: lines.slice(startIndex, index + 1).join(''),
 				nextIndex: index + 1,
@@ -284,12 +359,24 @@ export function parseMarkdownBlocks(source: string): MarkdownBlock[] {
 	}
 
 	while (index < lines.length) {
-		const line = lines[index];
-
-		if (/^(```|~~~)/.test(line)) {
-			const fencedCode = consumeFencedCode(lines, index);
+		const fencedCode = consumeFencedCode(lines, index);
+		if (fencedCode) {
 			blocks.push(createBlock(blocks.length, 'fencedCode', fencedCode.source, '', false));
 			index = fencedCode.nextIndex;
+			continue;
+		}
+
+		const indentedCode = consumeIndentedCode(lines, index);
+		if (indentedCode) {
+			blocks.push(createBlock(blocks.length, 'indentedCode', indentedCode.source, '', false));
+			index = indentedCode.nextIndex;
+			continue;
+		}
+
+		const htmlBlock = consumeHtmlBlock(lines, index);
+		if (htmlBlock) {
+			blocks.push(createBlock(blocks.length, 'html', htmlBlock.source, '', false));
+			index = htmlBlock.nextIndex;
 			continue;
 		}
 
@@ -300,6 +387,7 @@ export function parseMarkdownBlocks(source: string): MarkdownBlock[] {
 			continue;
 		}
 
+		const line = lines[index];
 		const kind = classifyLine(line);
 
 		if (kind === 'blank' || kind === 'html') {

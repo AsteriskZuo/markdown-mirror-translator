@@ -166,6 +166,28 @@ suite('Markdown renderer', () => {
 		assert.strictEqual(rendered, 'World\n');
 	});
 
+	test('renders skipped non-translatable blocks exactly as source', () => {
+		const rendered = renderMarkdown(
+			[
+				block({
+					kind: 'frontmatter',
+					source: '---\ntitle: Example\n---\n',
+					translatable: false,
+					translatedText: '',
+				}),
+				block({
+					kind: 'indentedCode',
+					source: '    code line\n    second line\n',
+					translatable: false,
+					translatedText: '',
+				}),
+			],
+			'translated',
+		);
+
+		assert.strictEqual(rendered, '---\ntitle: Example\n---\n    code line\n    second line\n');
+	});
+
 	test('renders translated tables from translated table cells', () => {
 		const rendered = renderMarkdown(
 			[

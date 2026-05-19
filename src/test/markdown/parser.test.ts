@@ -50,6 +50,28 @@ suite('Markdown parser', () => {
 		assert.strictEqual(blocks[4].translatable, false);
 	});
 
+	test('treats indented code blocks and multi-line HTML blocks as non-translatable', () => {
+		const blocks = parseMarkdownBlocks('Intro paragraph\n\n    ```ts\n    const value = 1;\n    ```\n\n<div>\n  <p>raw html</p>\n</div>\n\nOutro paragraph\n');
+
+		assert.deepStrictEqual(
+			blocks.map((block) => ({
+				kind: block.kind,
+				source: block.source,
+				text: block.text,
+				translatable: block.translatable,
+			})),
+			[
+				{ kind: 'paragraph', source: 'Intro paragraph\n', text: 'Intro paragraph', translatable: true },
+				{ kind: 'blank', source: '\n', text: '', translatable: false },
+				{ kind: 'indentedCode', source: '    ```ts\n    const value = 1;\n    ```\n', text: '', translatable: false },
+				{ kind: 'blank', source: '\n', text: '', translatable: false },
+				{ kind: 'html', source: '<div>\n  <p>raw html</p>\n</div>\n', text: '', translatable: false },
+				{ kind: 'blank', source: '\n', text: '', translatable: false },
+				{ kind: 'paragraph', source: 'Outro paragraph\n', text: 'Outro paragraph', translatable: true },
+			],
+		);
+	});
+
 	test('treats task list checkboxes as list item structure', () => {
 		const blocks = parseMarkdownBlocks('  * [x] hello\n  2. [ ] world\n');
 

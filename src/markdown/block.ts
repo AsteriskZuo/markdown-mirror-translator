@@ -8,6 +8,7 @@ export type MarkdownBlockKind =
 	| 'table'
 	| 'tableRow'
 	| 'fencedCode'
+	| 'indentedCode'
 	| 'html'
 	| 'protected';
 

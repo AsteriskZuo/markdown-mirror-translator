@@ -126,6 +126,43 @@ suite('Translation scheduler', () => {
 		assert.strictEqual(result.blocks[0].state, 'translated');
 	});
 
+	test('does not send skipped markdown blocks to the translation provider', async () => {
+		const provider = new RecordingProvider(undefined, 500);
+		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
+			parserVersion: 'parser-v1',
+			concurrency: 1,
+		});
+
+		const result = await scheduler.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			blocks: [
+				sourceBlock({
+					id: 'block-1',
+					kind: 'frontmatter',
+					translatable: false,
+					text: '',
+					source: '---\ntitle: Example\n---\n',
+					hash: 'hash-frontmatter',
+				}),
+				sourceBlock({
+					id: 'block-2',
+					kind: 'indentedCode',
+					translatable: false,
+					text: '',
+					source: '    code line\n',
+					hash: 'hash-code',
+				}),
+				sourceBlock({ id: 'block-3', text: 'Translate me', hash: 'hash-text' }),
+			],
+		});
+
+		assert.strictEqual(provider.inputs.length, 1);
+		assert.strictEqual(result.blocks[0].state, 'skipped');
+		assert.strictEqual(result.blocks[1].state, 'skipped');
+		assert.strictEqual(result.blocks[2].state, 'translated');
+	});
+
 	test('splits long text and limits concurrency', async () => {
 		const provider = new RecordingProvider();
 		const scheduler = new TranslationScheduler(provider, new TranslationCache(new MemoryMemento()), {
