@@ -6,6 +6,10 @@ Markdown Mirror Translator 是一个 VS Code Markdown 源文档翻译插件。�
 
 [English README](./README.md)
 
+## 演示
+
+![Markdown Mirror Translator 演示](docs/res/markdown-mirror-translator-demo.gif)
+
 ## 功能
 
 - 通过命令面板或编辑器标题栏按钮翻译当前 Markdown 文件。

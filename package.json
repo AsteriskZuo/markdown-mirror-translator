@@ -2,7 +2,8 @@
   "name": "markdown-mirror-translator",
   "displayName": "Markdown Mirror Translator",
   "description": "Markdown Mirror Translator",
-  "version": "1.1.1",
+  "icon": "assets/icon.png",
+  "version": "1.1.2",
   "license": "MIT",
   "publisher": "asteriskzuo",
   "repository": {

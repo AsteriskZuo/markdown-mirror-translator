@@ -6,6 +6,10 @@ It is not a Markdown preview renderer. It does not replace VS Code's built-in Ma
 
 [中文说明](./README.zh-CN.md)
 
+## Demo
+
+![Markdown Mirror Translator demo](docs/res/markdown-mirror-translator-demo.gif)
+
 ## Features
 
 - Translate the current Markdown file from the command palette or editor title button.
