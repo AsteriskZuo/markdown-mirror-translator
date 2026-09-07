@@ -60,7 +60,7 @@ suite('Markdown Mirror Translator shell', () => {
 	});
 
 	test('extension commands are registered after activation', async () => {
-		const extension = vscode.extensions.getExtension('undefined_publisher.markdown-mirror-translator');
+		const extension = vscode.extensions.getExtension('asteriskzuo.markdown-mirror-translator');
 
 		assert.ok(extension);
 		await extension.activate();
@@ -72,7 +72,7 @@ suite('Markdown Mirror Translator shell', () => {
 	});
 
 	test('extension activation registers translated document provider and scroll synchronizer', async () => {
-		const extension = vscode.extensions.getExtension('undefined_publisher.markdown-mirror-translator');
+		const extension = vscode.extensions.getExtension('asteriskzuo.markdown-mirror-translator');
 
 		assert.ok(extension);
 		await extension.activate();

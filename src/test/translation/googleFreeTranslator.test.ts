@@ -62,4 +62,73 @@ suite('Google free translator provider', () => {
 			/Google free translator returned an unsupported response shape/,
 		);
 	});
+
+	test('retries once after a timeout and succeeds', async () => {
+		let requestCount = 0;
+		const translator = new GoogleFreeTranslator(async () => {
+			requestCount += 1;
+			if (requestCount === 1) {
+				throw createTimeoutError();
+			}
+
+			return {
+				ok: true,
+				status: 200,
+				text: async () => '[[["你好","Hello",null,null,1]],null,"en"]',
+			};
+		}, 0);
+
+		const result = await translator.translate({
+			sourceLanguage: 'en',
+			targetLanguage: 'zh-CN',
+			text: 'Hello',
+		});
+
+		assert.strictEqual(result.text, '你好');
+		assert.strictEqual(requestCount, 2);
+	});
+
+	test('reports timeout after retrying once', async () => {
+		let requestCount = 0;
+		const translator = new GoogleFreeTranslator(async () => {
+			requestCount += 1;
+			throw createTimeoutError();
+		}, 0);
+
+		await assert.rejects(
+			() =>
+				translator.translate({
+					sourceLanguage: 'en',
+					targetLanguage: 'zh-CN',
+					text: 'Hello',
+				}),
+			/Google free translator request timed out after 30 seconds/,
+		);
+		assert.strictEqual(requestCount, 2);
+	});
+
+	test('does not retry non-timeout errors', async () => {
+		let requestCount = 0;
+		const translator = new GoogleFreeTranslator(async () => {
+			requestCount += 1;
+			throw new Error('connection refused');
+		}, 0);
+
+		await assert.rejects(
+			() =>
+				translator.translate({
+					sourceLanguage: 'en',
+					targetLanguage: 'zh-CN',
+					text: 'Hello',
+				}),
+			/connection refused/,
+		);
+		assert.strictEqual(requestCount, 1);
+	});
 });
+
+function createTimeoutError(): Error {
+	const error = new Error('The operation timed out.');
+	error.name = 'TimeoutError';
+	return error;
+}

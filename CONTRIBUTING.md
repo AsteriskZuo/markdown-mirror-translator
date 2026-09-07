@@ -52,14 +52,15 @@ Use VS Code's Extension Development Host to debug the extension locally. This is
 
 1. Open the repository in VS Code.
 2. Install dependencies with `npm install`.
-3. Open the Run and Debug view:
+3. Install the recommended [esbuild Problem Matchers](https://marketplace.visualstudio.com/items?itemName=connor4312.esbuild-problem-matchers) extension. Without it, launching fails with `Invalid problemMatcher reference: $esbuild-watch`, because the `watch:esbuild` task in `.vscode/tasks.json` relies on the problem matcher that extension provides.
+4. Open the Run and Debug view:
    - macOS: `Cmd+Shift+D`
    - Windows/Linux: `Ctrl+Shift+D`
-4. Select `Run Extension` from the debug configuration dropdown.
-5. Press `F5` or click the green Run button.
-6. VS Code opens a second window named Extension Development Host.
-7. In the Extension Development Host window, open a `.md` file.
-8. Run `Markdown Mirror Translator: Translate Current File` from the command palette.
+5. Select `Run Extension` from the debug configuration dropdown.
+6. Press `F5` or click the green Run button.
+7. VS Code opens a second window named Extension Development Host.
+8. In the Extension Development Host window, open a `.md` file.
+9. Run `Markdown Mirror Translator: Translate Current File` from the command palette.
 
 Use the original VS Code window for source code and breakpoints. Use the Extension Development Host window as the test instance where you operate the extension like a user.
 
@@ -121,6 +122,11 @@ npm test
 ```
 
 `npm test` uses `vscode-test` and may need VS Code/Electron startup and network access. In agent sessions, run it with the narrow tool-level escalation prefix `["npm", "test"]` as described in [AGENTS.md](./AGENTS.md).
+
+Troubleshooting:
+
+- If `npm test` fails with `spawn .../Contents/MacOS/Electron ENOENT` on macOS, the downloaded VS Code is 1.110 or newer, where the main executable was renamed from `Electron` to `Code` and the compatibility symlink was removed. This repository pins `@vscode/test-cli` `^0.0.15` and `@vscode/test-electron` `^3.1.0`, which resolve the executable from `Info.plist`; run `npm install` to pick them up. Do not hand-add an `Electron` symlink inside the downloaded `.app` bundle — it breaks the code signature and VS Code then dies with `SIGKILL`.
+- Deleting `.vscode-test/` and rerunning `npm test` is safe; the test runner downloads a fresh VS Code copy.
 
 ## Architecture Overview
 
@@ -253,3 +259,29 @@ Before opening or merging a pull request:
 - Product or architecture decisions are documented under `docs/` when they affect future development.
 - Tests cover new behavior or bug fixes.
 - `npm run check-types`, `npm run lint`, `npm run compile`, and `npm test` pass unless the PR explicitly documents why a narrower verification is sufficient.
+
+## Releasing
+
+Publishing to the VS Code Marketplace is done by the publisher owner. The scripts are already wired in `package.json`.
+
+One-time setup:
+
+1. Create an Azure DevOps account and a Personal Access Token with organization **All accessible organizations** and scope **Marketplace → Manage**.
+2. Create the publisher at <https://marketplace.visualstudio.com/manage> and keep it identical to the `publisher` field in `package.json`.
+3. Log in once on the release machine: `npx vsce login <publisher>`.
+
+Release steps:
+
+1. Update `CHANGELOG.md`, and update `README.md` / `README.zh-CN.md` when user-facing behavior changed.
+2. Bump the version. The Marketplace rejects re-publishing an existing version:
+   ```bash
+   npm version patch   # or minor / major
+   ```
+3. Run full verification: `npm run compile-tests`, `npm run check-types`, `npm run lint`, `npm run compile`, `npm test`.
+4. Publish from the CLI:
+   ```bash
+   npm run vscode:publish
+   ```
+   Or build a `.vsix` with `npm run vscode:vsix` and upload it manually from the publisher management page, which is useful for a first release or when the CLI token has problems.
+
+A new release usually appears on the Marketplace within minutes, after an automated security scan. To distribute a build without publishing, hand out the `.vsix` and install it with `Extensions: Install from VSIX...`.

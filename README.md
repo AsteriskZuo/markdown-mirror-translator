@@ -173,6 +173,7 @@ The provider is intentionally isolated behind an internal provider interface. Fu
 ## Error Handling
 
 - If a single block fails to translate, the translated document keeps the original source block for that section.
+- Requests to the free provider time out after 30 seconds and are retried once automatically before failing.
 - If some blocks fail, the extension shows a partial-failure message after translation completes.
 - You can run `Translate Current File` again to retry.
 - Cached successful blocks can be reused on later runs.

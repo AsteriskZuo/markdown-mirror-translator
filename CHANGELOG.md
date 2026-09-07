@@ -4,6 +4,10 @@ All notable changes to the "markdown-mirror-translator" extension will be docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.1.3] - 2026-09-07
+
+- Add a 30-second timeout to `google-free` translation requests and automatically retry once after a timeout, so slow or rate-limited free API responses fail with a clear message instead of hanging.
+
 ## [1.1.2] - 2026-06-09
 
 - Add a marketplace icon for the extension.
